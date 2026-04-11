@@ -1,0 +1,745 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Financeiro NG</title>
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+
+<!-- Sidebar -->
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-logo">
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+    <span>Financeiro NG</span>
+  </div>
+  <nav class="sidebar-nav">
+    <a href="#" class="nav-item active" data-view="dashboard">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+      Dashboard
+    </a>
+    <a href="#" class="nav-item" data-view="clientes">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      Clientes
+    </a>
+    <a href="#" class="nav-item" data-view="cobrancas">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+      Cobranças
+    </a>
+    <a href="#" class="nav-item" data-view="despesas">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+      Despesas
+    </a>
+    <a href="#" class="nav-item" data-view="contaspagar">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+      Contas a Pagar
+    </a>
+    <a href="#" class="nav-item" data-view="relatorios">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+      Relatórios
+    </a>
+    <a href="#" class="nav-item" data-view="configuracoes">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93l-1.41 1.41M4.93 4.93l1.41 1.41M19.07 19.07l-1.41-1.41M4.93 19.07l1.41-1.41M12 2v2M12 20v2M2 12h2M20 12h2"/></svg>
+      Configurações
+    </a>
+  </nav>
+</aside>
+
+<!-- Main -->
+<main class="main" id="main">
+
+  <!-- Topbar -->
+  <header class="topbar">
+    <button class="menu-btn" id="menuBtn" onclick="toggleSidebar()">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+    </button>
+    <h1 class="page-title" id="pageTitle">Dashboard</h1>
+    <div class="topbar-actions" id="topbarActions"></div>
+  </header>
+
+  <!-- VIEWS -->
+
+  <!-- Dashboard -->
+  <div class="view active" id="view-dashboard">
+    <div id="alertas-container"></div>
+
+    <div class="cards-section-label">Mês Atual</div>
+    <div class="cards-grid">
+      <div class="card card-purple">
+        <div class="card-label">A Receber (mês atual)</div>
+        <div class="card-value" id="totalReceberMes">R$ 0,00</div>
+        <div class="card-sub" id="qtdReceberMes">0 cobranças</div>
+      </div>
+      <div class="card card-green">
+        <div class="card-label">Recebidas (mês atual)</div>
+        <div class="card-value" id="totalPagas">R$ 0,00</div>
+        <div class="card-sub" id="qtdPagas">0 cobranças</div>
+      </div>
+      <div class="card card-red">
+        <div class="card-label">A Pagar (mês atual)</div>
+        <div class="card-value" id="totalPagarMes">R$ 0,00</div>
+        <div class="card-sub" id="qtdPagarMes">0 contas</div>
+      </div>
+      <div class="card card-orange">
+        <div class="card-label">Já Pagas (mês atual)</div>
+        <div class="card-value" id="totalContasPagas">R$ 0,00</div>
+        <div class="card-sub" id="qtdContasPagas">0 contas</div>
+      </div>
+      <div class="card card-liquido" id="cardLiquidoMes">
+        <div class="card-label">Resultado Líquido (mês)</div>
+        <div class="card-value" id="totalLiquidoMes">R$ 0,00</div>
+        <div class="card-sub" id="subLiquidoMes">resultado do mês</div>
+      </div>
+    </div>
+
+    <div class="cards-section-label">Consolidado</div>
+    <div class="cards-grid">
+      <div class="card card-blue">
+        <div class="card-label">Total a Receber</div>
+        <div class="card-value" id="totalReceber">R$ 0,00</div>
+        <div class="card-sub" id="qtdReceber">0 cobranças</div>
+      </div>
+      <div class="card card-red">
+        <div class="card-label">Vencidas e não pagas</div>
+        <div class="card-value" id="totalVencidas">R$ 0,00</div>
+        <div class="card-sub" id="qtdVencidas">0 cobranças</div>
+      </div>
+      <div class="card card-orange">
+        <div class="card-label">A Vencer (7 dias)</div>
+        <div class="card-value" id="totalProximas">R$ 0,00</div>
+        <div class="card-sub" id="qtdProximas">0 cobranças</div>
+      </div>
+    </div>
+
+    <div class="resultado-financeiro">
+      <div class="res-item res-item-bruto">
+        <div class="res-label">A Receber (Bruto)</div>
+        <div class="res-valor" id="res-bruto">R$ 0,00</div>
+        <div class="res-sub">cobranças pendentes</div>
+      </div>
+      <div class="res-separador">−</div>
+      <div class="res-item res-item-pagar">
+        <div class="res-label">A Pagar</div>
+        <div class="res-valor" id="res-pagar">R$ 0,00</div>
+        <div class="res-sub" id="res-pagar-qtd">0 contas</div>
+      </div>
+      <div class="res-separador">=</div>
+      <div class="res-item res-item-liquido">
+        <div class="res-label" id="res-liquido-label">Resultado Líquido</div>
+        <div class="res-valor positivo" id="res-liquido">R$ 0,00</div>
+        <div class="res-sub"><span id="res-liquido-icon">▲</span> resultado do período</div>
+      </div>
+    </div>
+
+    <div class="section-row">
+      <section class="section" style="flex:1.3">
+        <div class="section-header">
+          <h2>Próximos Vencimentos</h2>
+          <a href="#" onclick="navegarPara('cobrancas')" class="link">Ver todas</a>
+        </div>
+        <div id="lista-proximas"></div>
+      </section>
+      <section class="section" style="flex:1">
+        <div class="section-header">
+          <h2>Distribuição por Categoria</h2>
+        </div>
+        <div class="chart-wrap"><canvas id="chartCategoria"></canvas></div>
+      </section>
+    </div>
+  </div>
+
+  <!-- Cobranças -->
+  <div class="view" id="view-cobrancas">
+    <div class="filters-bar">
+      <div class="filter-group">
+        <input type="text" class="input-search" id="searchInput" placeholder="Buscar descrição..." oninput="renderCobrancas()">
+      </div>
+      <div class="filter-group">
+        <select class="select-filter" id="filterStatus" onchange="renderCobrancas()">
+          <option value="">Todos os status</option>
+          <option value="pendente">Pendente</option>
+          <option value="pago">Pago</option>
+          <option value="vencido">Vencido</option>
+        </select>
+        <select class="select-filter" id="filterClienteCobranca" onchange="renderCobrancas()">
+          <option value="">Todos os clientes</option>
+        </select>
+        <select class="select-filter" id="filterCategoria" onchange="renderCobrancas()">
+          <option value="">Todas categorias</option>
+        </select>
+        <select class="select-filter" id="filterMes" onchange="renderCobrancas()">
+          <option value="">Todos os meses</option>
+        </select>
+      </div>
+      <button class="btn btn-outline" onclick="exportarCSV()">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Exportar CSV
+      </button>
+    </div>
+
+    <div class="resumo-mes" id="resumo-mes"></div>
+    <div class="table-summary" id="table-summary"></div>
+
+    <div class="table-wrap">
+      <table class="table" id="tabelaCobrancas">
+        <thead>
+          <tr>
+            <th class="sortable-th"><button type="button" class="table-sort-btn" onclick="ordenarTabela('cobrancas', 'descricao')">Descrição <span id="sort-cobrancas-descricao" class="sort-indicator"></span></button></th>
+            <th class="sortable-th"><button type="button" class="table-sort-btn" onclick="ordenarTabela('cobrancas', 'cliente')">Cliente <span id="sort-cobrancas-cliente" class="sort-indicator"></span></button></th>
+            <th class="sortable-th"><button type="button" class="table-sort-btn" onclick="ordenarTabela('cobrancas', 'categoria')">Categoria <span id="sort-cobrancas-categoria" class="sort-indicator"></span></button></th>
+            <th class="sortable-th"><button type="button" class="table-sort-btn" onclick="ordenarTabela('cobrancas', 'dataVencimento')">Vencimento <span id="sort-cobrancas-dataVencimento" class="sort-indicator"></span></button></th>
+            <th class="sortable-th"><button type="button" class="table-sort-btn" onclick="ordenarTabela('cobrancas', 'valor')">Valor <span id="sort-cobrancas-valor" class="sort-indicator"></span></button></th>
+            <th class="sortable-th"><button type="button" class="table-sort-btn" onclick="ordenarTabela('cobrancas', 'recorrencia')">Recorrência <span id="sort-cobrancas-recorrencia" class="sort-indicator"></span></button></th>
+            <th class="sortable-th"><button type="button" class="table-sort-btn" onclick="ordenarTabela('cobrancas', 'status')">Status <span id="sort-cobrancas-status" class="sort-indicator"></span></button></th>
+            <th>Ações</th>
+          </tr>
+        </thead>
+        <tbody id="tabelaBody"></tbody>
+      </table>
+      <div id="emptyState" class="empty-state" style="display:none">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        <p>Nenhuma cobrança encontrada</p>
+        <button class="btn btn-primary" onclick="abrirModalCobranca()">Nova Cobrança</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Relatórios -->
+  <div class="view" id="view-relatorios">
+    <div class="filters-bar">
+      <div class="filter-group">
+        <label class="filter-label">Período:</label>
+        <input type="date" class="input input-date" id="relDataInicio" onchange="renderRelatorios()">
+        <span class="filter-label">até</span>
+        <input type="date" class="input input-date" id="relDataFim" onchange="renderRelatorios()">
+      </div>
+      <div class="filter-group">
+        <select class="select-filter" id="relModo" onchange="renderRelatorios()">
+          <option value="ambos">Cobranças + Custos</option>
+          <option value="cobrancas">Relatório de Cobranças</option>
+          <option value="custos">Relatório de Custos</option>
+        </select>
+        <select class="select-filter" id="relCliente" onchange="renderRelatorios()">
+          <option value="">Todos os clientes</option>
+        </select>
+        <select class="select-filter" id="relTipoCobranca" onchange="renderRelatorios()">
+          <option value="">Todos os tipos</option>
+        </select>
+      </div>
+      <button class="btn btn-outline" onclick="imprimirRelatorio()">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+        Imprimir
+      </button>
+    </div>
+
+    <div class="cards-grid" id="relCardsGrid"></div>
+
+    <div class="section-row" id="relCobrancasCharts">
+      <section class="section" style="flex:1.5">
+        <div class="section-header"><h2>Evolução Mensal</h2></div>
+        <div class="chart-wrap-tall" id="chartEvolucaoWrap"><canvas id="chartEvolucao"></canvas></div>
+      </section>
+      <section class="section" style="flex:1">
+        <div class="section-header"><h2>Por Categoria</h2></div>
+        <div class="chart-wrap-tall" id="chartRelCategoriaWrap"><canvas id="chartRelCategoria"></canvas></div>
+      </section>
+    </div>
+
+    <section class="section" id="relDetalhamentoCobrancas">
+      <div class="section-header"><h2>Detalhamento</h2></div>
+      <table class="table">
+        <thead>
+          <tr><th>Categoria</th><th>Qtd</th><th>Pendente</th><th>Pago</th><th>Vencido</th><th>Total</th></tr>
+        </thead>
+        <tbody id="relTableBody"></tbody>
+      </table>
+    </section>
+
+    <section class="section" id="relCustosSection">
+      <div class="section-header"><h2>Relatório de Custos</h2></div>
+      <table class="table">
+        <thead>
+          <tr><th>Tipo</th><th>Qtd</th><th>Em Aberto</th><th>Pago/Faturado</th><th>Total</th></tr>
+        </thead>
+        <tbody id="relCustosBody"></tbody>
+      </table>
+    </section>
+
+    <section class="section" id="relContasPagarSection">
+      <div class="section-header"><h2>Relatório de Contas a Pagar</h2></div>
+      <table class="table">
+        <thead>
+          <tr><th>Tipo</th><th>Qtd</th><th>Pendente</th><th>Pago</th><th>Vencido</th><th>Total</th></tr>
+        </thead>
+        <tbody id="relContasPagarBody"></tbody>
+      </table>
+    </section>
+  </div>
+
+  <!-- Configurações -->
+  <div class="view" id="view-configuracoes">
+    <section class="section" style="max-width:560px">
+      <div class="section-header"><h2>Categorias</h2></div>
+      <div id="listaCategorias" class="tags-list"></div>
+      <div class="input-row" style="margin-top:16px">
+        <input type="text" class="input" id="novaCategoria" placeholder="Nova categoria..." maxlength="40">
+        <input type="color" id="corCategoria" value="#6366f1" class="input-color" title="Cor da categoria">
+        <button class="btn btn-primary" onclick="adicionarCategoria()">Adicionar</button>
+      </div>
+    </section>
+
+    <section class="section" style="max-width:560px; margin-top:20px">
+      <div class="section-header"><h2>Regras de Alerta</h2></div>
+      <div class="form-group">
+        <label>Alertar vencimentos com antecedência de:</label>
+        <div class="input-row">
+          <input type="number" class="input" id="diasAlerta" min="1" max="30" value="7" style="width:80px">
+          <span style="align-self:center;color:var(--text-muted)">dias</span>
+          <button class="btn btn-primary" onclick="salvarConfig()">Salvar</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" style="max-width:560px; margin-top:20px">
+      <div class="section-header"><h2>Dados</h2></div>
+      <div class="btn-group">
+        <button class="btn btn-outline" onclick="exportarDados()">Exportar Backup (JSON)</button>
+        <button class="btn btn-outline" onclick="document.getElementById('importFile').click()">Importar Backup</button>
+        <input type="file" id="importFile" accept=".json" style="display:none" onchange="importarDados(event)">
+        <button class="btn btn-danger" onclick="limparDados()">Limpar Todos os Dados</button>
+      </div>
+    </section>
+  </div>
+
+  <!-- Contas a Pagar -->
+  <div class="view" id="view-contaspagar">
+    <div class="filters-bar">
+      <div class="filter-group">
+        <input type="text" class="input-search" id="searchCP" placeholder="Buscar conta..." oninput="renderContasPagar()">
+      </div>
+      <div class="filter-group">
+        <select class="select-filter" id="filterStatusCP" onchange="renderContasPagar()">
+          <option value="">Todos os status</option>
+          <option value="pendente">Pendente</option>
+          <option value="pago">Pago</option>
+          <option value="vencido">Vencido</option>
+        </select>
+        <select class="select-filter" id="filterTipoCP" onchange="renderContasPagar()">
+          <option value="">Todos os tipos</option>
+          <option>Prestadores de Serviço</option>
+          <option>Tributos / Impostos</option>
+          <option>Notas Fiscais</option>
+          <option>Folha de Pagamento</option>
+          <option>Aluguel / Locações</option>
+          <option>Outros</option>
+        </select>
+        <select class="select-filter" id="filterMesCP" onchange="renderContasPagar()">
+          <option value="">Todos os meses</option>
+        </select>
+        <input type="date" class="input input-date" id="filterDataInicioCP" onchange="renderContasPagar()">
+        <input type="date" class="input input-date" id="filterDataFimCP" onchange="renderContasPagar()">
+      </div>
+      <button class="btn btn-primary" onclick="abrirModalContaPagar()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Nova Conta
+      </button>
+    </div>
+    <div id="resumo-mes-cp" style="margin-bottom:14px"></div>
+    <div class="table-summary" id="cp-summary"></div>
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th class="sortable-th"><button type="button" class="table-sort-btn" onclick="ordenarTabela('contaspagar', 'descricao')">Descrição <span id="sort-contaspagar-descricao" class="sort-indicator"></span></button></th>
+            <th class="sortable-th"><button type="button" class="table-sort-btn" onclick="ordenarTabela('contaspagar', 'tipo')">Tipo <span id="sort-contaspagar-tipo" class="sort-indicator"></span></button></th>
+            <th class="sortable-th"><button type="button" class="table-sort-btn" onclick="ordenarTabela('contaspagar', 'dataVencimento')">Vencimento <span id="sort-contaspagar-dataVencimento" class="sort-indicator"></span></button></th>
+            <th class="sortable-th"><button type="button" class="table-sort-btn" onclick="ordenarTabela('contaspagar', 'valor')">Valor <span id="sort-contaspagar-valor" class="sort-indicator"></span></button></th>
+            <th class="sortable-th"><button type="button" class="table-sort-btn" onclick="ordenarTabela('contaspagar', 'recorrencia')">Recorrência <span id="sort-contaspagar-recorrencia" class="sort-indicator"></span></button></th>
+            <th class="sortable-th"><button type="button" class="table-sort-btn" onclick="ordenarTabela('contaspagar', 'status')">Status <span id="sort-contaspagar-status" class="sort-indicator"></span></button></th>
+            <th>Ações</th>
+          </tr>
+        </thead>
+        <tbody id="tabelaCPBody"></tbody>
+      </table>
+      <div id="emptyStateCP" class="empty-state" style="display:none">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+        <p>Nenhuma conta a pagar cadastrada</p>
+        <button class="btn btn-primary" onclick="abrirModalContaPagar()">Nova Conta</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Clientes -->
+  <div class="view" id="view-clientes">
+    <div class="filters-bar">
+      <div class="filter-group">
+        <input type="text" class="input-search" id="searchClientes" placeholder="Buscar cliente..." oninput="renderClientes()">
+      </div>
+      <button class="btn btn-primary" onclick="abrirModalCliente()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Novo Cliente
+      </button>
+    </div>
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Nome / Razão Social</th>
+            <th>CPF / CNPJ</th>
+            <th>Email</th>
+            <th>Telefone</th>
+            <th>Ações</th>
+          </tr>
+        </thead>
+        <tbody id="tabelaClientesBody"></tbody>
+      </table>
+      <div id="emptyStateClientes" class="empty-state" style="display:none">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+        <p>Nenhum cliente cadastrado</p>
+        <button class="btn btn-primary" onclick="abrirModalCliente()">Novo Cliente</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Despesas -->
+  <div class="view" id="view-despesas">
+    <div class="filters-bar">
+      <div class="filter-group">
+        <input type="text" class="input-search" id="searchDespesas" placeholder="Buscar despesa..." oninput="renderDespesas()">
+      </div>
+      <div class="filter-group">
+        <select class="select-filter" id="filterClienteDespesa" onchange="renderDespesas()">
+          <option value="">Todos os clientes</option>
+        </select>
+        <select class="select-filter" id="filterStatusDespesa" onchange="renderDespesas()">
+          <option value="">Todos os status</option>
+          <option value="pendente">Pendente</option>
+          <option value="faturado">Faturado</option>
+        </select>
+        <select class="select-filter" id="filterMesDespesa" onchange="renderDespesas()">
+          <option value="">Todos os meses</option>
+        </select>
+        <input type="date" class="input input-date" id="filterDataInicioDespesa" onchange="renderDespesas()">
+        <input type="date" class="input input-date" id="filterDataFimDespesa" onchange="renderDespesas()">
+      </div>
+      <button class="btn btn-primary" onclick="abrirModalDespesa()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Nova Despesa
+      </button>
+    </div>
+    <div class="table-summary" id="despesas-summary"></div>
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th class="sortable-th"><button type="button" class="table-sort-btn" onclick="ordenarTabela('despesas', 'cliente')">Cliente <span id="sort-despesas-cliente" class="sort-indicator"></span></button></th>
+            <th class="sortable-th"><button type="button" class="table-sort-btn" onclick="ordenarTabela('despesas', 'descricao')">Descrição <span id="sort-despesas-descricao" class="sort-indicator"></span></button></th>
+            <th class="sortable-th"><button type="button" class="table-sort-btn" onclick="ordenarTabela('despesas', 'data')">Data <span id="sort-despesas-data" class="sort-indicator"></span></button></th>
+            <th class="sortable-th"><button type="button" class="table-sort-btn" onclick="ordenarTabela('despesas', 'valor')">Valor <span id="sort-despesas-valor" class="sort-indicator"></span></button></th>
+            <th class="sortable-th"><button type="button" class="table-sort-btn" onclick="ordenarTabela('despesas', 'status')">Status <span id="sort-despesas-status" class="sort-indicator"></span></button></th>
+            <th>Ações</th>
+          </tr>
+        </thead>
+        <tbody id="tabelaDespesasBody"></tbody>
+      </table>
+      <div id="emptyStateDespesas" class="empty-state" style="display:none">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+        <p>Nenhuma despesa cadastrada</p>
+        <button class="btn btn-primary" onclick="abrirModalDespesa()">Nova Despesa</button>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<!-- Modal Contas a Pagar -->
+<div class="modal-overlay" id="modalCPOverlay" onclick="fecharModalContaPagar(event)">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="modalCPTitulo">Nova Conta a Pagar</h2>
+      <button class="modal-close" onclick="fecharModalCPForce()">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <form id="formContaPagar" onsubmit="salvarContaPagar(event)">
+      <input type="hidden" id="editCPId">
+      <div class="form-row">
+        <div class="form-group flex2">
+          <label>Descrição</label>
+          <input type="text" class="input" id="cpDescricao" maxlength="100" placeholder="Ex: Aluguel, Contador, DARF...">
+        </div>
+        <div class="form-group">
+          <label>Valor (R$) *</label>
+          <input type="text" class="input money-input" id="cpValor" required inputmode="decimal" autocomplete="off" placeholder="0,00">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Vencimento *</label>
+          <input type="date" class="input" id="cpVencimento" required>
+        </div>
+        <div class="form-group">
+          <label>Tipo</label>
+          <select class="input" id="cpTipo">
+            <option value="">Selecione...</option>
+            <option>Prestadores de Serviço</option>
+            <option>Tributos / Impostos</option>
+            <option>Notas Fiscais</option>
+            <option>Folha de Pagamento</option>
+            <option>Aluguel / Locações</option>
+            <option>Outros</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Recorrência</label>
+          <select class="input" id="cpRecorrencia">
+            <option value="nenhuma">Sem recorrência</option>
+            <option value="semanal">Semanal</option>
+            <option value="quinzenal">Quinzenal</option>
+            <option value="mensal">Mensal</option>
+            <option value="bimestral">Bimestral</option>
+            <option value="trimestral">Trimestral</option>
+            <option value="semestral">Semestral</option>
+            <option value="anual">Anual</option>
+          </select>
+        </div>
+        <div class="form-group" id="grupoRepetirCP" style="display:none">
+          <label>Repetir por</label>
+          <div class="input-row">
+            <input type="number" class="input" id="cpRepeticoes" min="1" max="60" value="12" style="width:80px">
+            <span style="align-self:center;color:var(--text-muted);font-size:13px">ocorrências</span>
+          </div>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Observações</label>
+        <textarea class="input" id="cpObservacoes" rows="2" maxlength="300" placeholder="Detalhes adicionais..."></textarea>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" onclick="fecharModalCPForce()">Cancelar</button>
+        <button type="submit" class="btn btn-primary">Salvar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal Clientes -->
+<div class="modal-overlay" id="modalClienteOverlay" onclick="fecharModalCliente(event)">
+  <div class="modal" style="max-width:500px">
+    <div class="modal-header">
+      <h2 id="modalClienteTitulo">Novo Cliente</h2>
+      <button class="modal-close" onclick="fecharModalClienteForce()">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <form id="formCliente" onsubmit="salvarCliente(event)">
+      <input type="hidden" id="editClienteId">
+      <div class="form-row">
+        <div class="form-group flex2">
+          <label>Nome / Razão Social *</label>
+          <input type="text" class="input" id="cNome" required maxlength="100" placeholder="Nome completo ou razão social">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>CPF / CNPJ</label>
+          <input type="text" class="input" id="cCpfCnpj" maxlength="20" placeholder="000.000.000-00">
+        </div>
+        <div class="form-group">
+          <label>Telefone</label>
+          <input type="text" class="input" id="cTelefone" maxlength="20" placeholder="(00) 00000-0000">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group flex2">
+          <label>Email</label>
+          <input type="email" class="input" id="cEmail" maxlength="100" placeholder="email@exemplo.com">
+        </div>
+      </div>
+      <div class="form-group" style="margin-bottom:14px">
+        <label>Endereço</label>
+        <input type="text" class="input" id="cEndereco" maxlength="200" placeholder="Rua, número, bairro, cidade">
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" onclick="fecharModalClienteForce()">Cancelar</button>
+        <button type="submit" class="btn btn-primary">Salvar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal Despesa -->
+<div class="modal-overlay" id="modalDespesaOverlay" onclick="fecharModalDespesa(event)">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-header">
+      <h2 id="modalDespesaTitulo">Nova Despesa</h2>
+      <button class="modal-close" onclick="fecharModalDespesaForce()">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <form id="formDespesa" onsubmit="salvarDespesa(event)">
+      <input type="hidden" id="editDespesaId">
+      <div class="form-row">
+        <div class="form-group flex2">
+          <label>Cliente *</label>
+          <select class="input" id="dCliente" required>
+            <option value="">Selecione um cliente</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group flex2">
+          <label>Descrição *</label>
+          <input type="text" class="input" id="dDescricao" required maxlength="200" placeholder="Ex: Custas processuais, Diligência...">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Data *</label>
+          <input type="date" class="input" id="dData" required>
+        </div>
+        <div class="form-group">
+          <label>Valor (R$) *</label>
+          <input type="text" class="input money-input" id="dValor" required inputmode="decimal" autocomplete="off" placeholder="0,00">
+        </div>
+      </div>
+      <div class="form-group" style="margin-bottom:14px">
+        <label>Observações</label>
+        <textarea class="input" id="dObservacoes" rows="2" maxlength="300" placeholder="Detalhes adicionais..."></textarea>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" onclick="fecharModalDespesaForce()">Cancelar</button>
+        <button type="submit" class="btn btn-primary">Salvar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Print Overlay -->
+<div id="printOverlay" class="print-overlay">
+  <div class="print-toolbar no-print">
+    <button class="btn btn-outline" onclick="fecharPrintOverlay()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      Fechar
+    </button>
+    <button class="btn btn-primary" onclick="window.print()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+      Imprimir
+    </button>
+  </div>
+  <div class="print-doc" id="printDoc"></div>
+</div>
+
+<!-- Modal Cobrança -->
+<div class="modal-overlay" id="modalOverlay" onclick="fecharModal(event)">
+  <div class="modal" id="modal">
+    <div class="modal-header">
+      <h2 id="modalTitulo">Nova Cobrança</h2>
+      <button class="modal-close" onclick="fecharModalForce()">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <form id="formCobranca" onsubmit="salvarCobranca(event)">
+      <input type="hidden" id="editId">
+      <div class="form-row">
+        <div class="form-group flex2">
+          <label>Cliente</label>
+          <input type="text" class="input" id="fCliente" list="clientesCobrancaList" maxlength="120" placeholder="Digite o nome do cliente ou selecione um cadastrado">
+          <datalist id="clientesCobrancaList"></datalist>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group flex2">
+          <label>Descrição</label>
+          <input type="text" class="input" id="fDescricao" maxlength="100" placeholder="Ex: Aluguel, Mensalidade...">
+        </div>
+        <div class="form-group">
+          <label>Valor (R$) *</label>
+          <input type="text" class="input money-input" id="fValor" required inputmode="decimal" autocomplete="off" placeholder="0,00">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Vencimento *</label>
+          <input type="date" class="input" id="fVencimento" required>
+        </div>
+        <div class="form-group">
+          <label>Categoria</label>
+          <select class="input" id="fCategoria"></select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Recorrência</label>
+          <select class="input" id="fRecorrencia">
+            <option value="nenhuma">Sem recorrência</option>
+            <option value="semanal">Semanal</option>
+            <option value="quinzenal">Quinzenal</option>
+            <option value="mensal">Mensal</option>
+            <option value="bimestral">Bimestral</option>
+            <option value="trimestral">Trimestral</option>
+            <option value="semestral">Semestral</option>
+            <option value="anual">Anual</option>
+          </select>
+        </div>
+        <div class="form-group" id="grupoRepetir">
+          <label>Repetir por</label>
+          <div class="input-row">
+            <input type="number" class="input" id="fRepeticoes" min="1" max="60" value="12" placeholder="12" style="width:80px">
+            <span style="align-self:center;color:var(--text-muted);font-size:13px">ocorrências</span>
+          </div>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Observações</label>
+        <textarea class="input" id="fObservacoes" rows="2" maxlength="300" placeholder="Detalhes adicionais..."></textarea>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" onclick="fecharModalForce()">Cancelar</button>
+        <button type="submit" class="btn btn-primary" id="btnSalvar">Salvar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal Baixa -->
+<div class="modal-overlay" id="modalBaixaOverlay" onclick="fecharModalBaixa(event)">
+  <div class="modal" id="modalBaixa" style="max-width:420px">
+    <div class="modal-header">
+      <h2>Dar Baixa no Pagamento</h2>
+      <button class="modal-close" onclick="fecharModalBaixaForce()">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div style="padding:0 0 8px">
+      <p id="baixaDescricao" style="color:var(--text-muted);margin-bottom:16px;font-size:14px"></p>
+      <div class="form-group">
+        <label>Data do Pagamento</label>
+        <input type="date" class="input" id="baixaData">
+      </div>
+      <div class="form-group">
+        <label>Valor Pago (R$)</label>
+        <input type="text" class="input money-input" id="baixaValor" inputmode="decimal" autocomplete="off" placeholder="0,00">
+      </div>
+      <div class="form-group">
+        <label>Observação</label>
+        <input type="text" class="input" id="baixaObs" placeholder="Opcional...">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="fecharModalBaixaForce()">Cancelar</button>
+      <button class="btn btn-success" onclick="confirmarBaixa()">Confirmar Pagamento</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast" class="toast"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
