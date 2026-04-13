@@ -1575,7 +1575,7 @@ function popularClientesForms() {
 function renderClientes() {
   const search = (document.getElementById('searchClientes')?.value || '').toLowerCase();
   let lista = state.clientes.filter(c =>
-    !search || c.nome.toLowerCase().includes(search) || (c.cpfCnpj || '').includes(search)
+    !search || c.nome.toLowerCase().includes(search) || (c.cpf_cnpj || '').includes(search)
   );
 
   const tbody = document.getElementById('tabelaClientesBody');
@@ -1596,7 +1596,7 @@ function renderClientes() {
           <div style="font-weight:600">${c.nome}</div>
           ${(qtdCob + qtdDesp) > 0 ? `<div style="font-size:11px;color:var(--text-muted)">${qtdCob} cobrança${qtdCob !== 1 ? 's' : ''} · ${qtdDesp} despesa${qtdDesp !== 1 ? 's' : ''} pendente${qtdDesp !== 1 ? 's' : ''} · ${fmt(totalPend)}</div>` : ''}
         </td>
-        <td>${c.cpfCnpj || '<span style="color:var(--text-light)">—</span>'}</td>
+        <td>${c.cpf_cnpj || '<span style="color:var(--text-light)">—</span>'}</td>
         <td>${c.email || '<span style="color:var(--text-light)">—</span>'}</td>
         <td>${c.telefone || '<span style="color:var(--text-light)">—</span>'}</td>
         <td>
@@ -1630,7 +1630,7 @@ function abrirModalCliente(id) {
     document.getElementById('editClienteId').value = c.id;
     document.getElementById('modalClienteTitulo').textContent = 'Editar Cliente';
     document.getElementById('cNome').value = c.nome;
-    document.getElementById('cCpfCnpj').value = c.cpfCnpj || '';
+    document.getElementById('ccpf_cnpj').value = c.cpf_cnpj || '';
     document.getElementById('cTelefone').value = c.telefone || '';
     document.getElementById('cEmail').value = c.email || '';
     document.getElementById('cEndereco').value = c.endereco || '';
@@ -1651,7 +1651,7 @@ function salvarCliente(event) {
   const id = document.getElementById('editClienteId').value;
   const dados = {
     nome: document.getElementById('cNome').value.trim(),
-    cpfCnpj: document.getElementById('cCpfCnpj').value.trim(),
+    cpf_cnpj: document.getElementById('cCpfCnpj').value.trim(),
     telefone: document.getElementById('cTelefone').value.trim(),
     email: document.getElementById('cEmail').value.trim(),
     endereco: document.getElementById('cEndereco').value.trim(),
@@ -1875,7 +1875,7 @@ function gerarNotaDebito(clienteId) {
         <div class="doc-section-title">Cliente</div>
         <div class="doc-client-grid">
           <div><span class="doc-label">Nome / Razão Social: </span><strong>${cliente.nome}</strong></div>
-          ${cliente.cpfCnpj ? `<div><span class="doc-label">CPF / CNPJ: </span>${cliente.cpfCnpj}</div>` : ''}
+          ${cliente.cpf_cnpj ? `<div><span class="doc-label">CPF / CNPJ: </span>${cliente.cpfCnpj}</div>` : ''}
           ${cliente.email ? `<div><span class="doc-label">Email: </span>${cliente.email}</div>` : ''}
           ${cliente.telefone ? `<div><span class="doc-label">Telefone: </span>${cliente.telefone}</div>` : ''}
           ${cliente.endereco ? `<div style="grid-column:1/-1"><span class="doc-label">Endereço: </span>${cliente.endereco}</div>` : ''}
@@ -1960,7 +1960,7 @@ function gerarRecibo(cobrancaId) {
         <div class="doc-section-title">Pagador</div>
         <div class="doc-client-grid">
           <div><span class="doc-label">Nome / Razão Social: </span><strong>${cliente.nome}</strong></div>
-          ${cliente.cpfCnpj ? `<div><span class="doc-label">CPF / CNPJ: </span>${cliente.cpfCnpj}</div>` : ''}
+          ${cliente.cpf_cnpj ? `<div><span class="doc-label">CPF / CNPJ: </span>${cliente.cpfCnpj}</div>` : ''}
           ${cliente.email ? `<div><span class="doc-label">Email: </span>${cliente.email}</div>` : ''}
           ${cliente.telefone ? `<div><span class="doc-label">Telefone: </span>${cliente.telefone}</div>` : ''}
         </div>
