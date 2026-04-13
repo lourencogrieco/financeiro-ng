@@ -2000,3 +2000,14 @@ function init() {
 }
 
 document.addEventListener('DOMContentLoaded', init);
+
+async function testarSupabase() {
+const { data, error } = await supabaseClient
+.from('clientes')
+.select('*');
+
+console.log('Clientes:', data);
+console.log('Erro:', error);
+}
+
+testarSupabase();
