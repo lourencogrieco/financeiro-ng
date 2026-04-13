@@ -4,6 +4,9 @@ const supabaseUrl ="https://gcucadlnxttlxckravui.supabase.co"
 const supabaseKey = "sb_publishable_5i0somnwIAvyLNImLSWYxg_yogC3bCb"
 
 const supabaseClient = supabase.createClient(supabaseUrl, supabaseKey);
+console.log("Biblioteca Supabase:", supabase);
+console.log("Cliente Supabase:", supabaseClient);
+
 
 // ===== STATE =====
 let state = {
