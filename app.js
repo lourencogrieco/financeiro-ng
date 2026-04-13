@@ -1679,6 +1679,9 @@ toast('Cliente atualizado!', 'success');
 const { error } = await supabaseClient
 .from('clientes')
 .insert([dados]);
+console.log('Dados enviados:', dados);
+console.log('Erro insert:', error);
+
 
 if (error) {
   console.error(error);
