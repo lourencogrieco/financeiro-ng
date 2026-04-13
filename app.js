@@ -201,7 +201,11 @@ return;
 }
 
 state.clientes = data || [];
+
 renderClientes();
+popularClientesForms();
+renderDashboard();
+
 }
 
 function salvarStorage() {
