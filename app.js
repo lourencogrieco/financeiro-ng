@@ -1646,29 +1646,56 @@ function fecharModalClienteForce() {
   document.getElementById('modalClienteOverlay').classList.remove('open');
 }
 
-function salvarCliente(event) {
-  event.preventDefault();
-  const id = document.getElementById('editClienteId').value;
-  const dados = {
-    nome: document.getElementById('cNome').value.trim(),
-    cpf_cnpj: document.getElementById('cCpfCnpj').value.trim(),
-    telefone: document.getElementById('cTelefone').value.trim(),
-    email: document.getElementById('cEmail').value.trim(),
-    endereco: document.getElementById('cEndereco').value.trim(),
-  };
-  if (id) {
-    const idx = state.clientes.findIndex(c => c.id === id);
-    if (idx !== -1) state.clientes[idx] = { ...state.clientes[idx], ...dados };
-    toast('Cliente atualizado!', 'success');
-  } else {
-    state.clientes.push({ id: uid(), ...dados, criadoEm: new Date().toISOString() });
-    toast('Cliente cadastrado!', 'success');
-  }
-  salvarStorage();
-  fecharModalClienteForce();
-  popularClientesForms();
-  renderClientes();
+async function salvarCliente(event) {
+event.preventDefault();
+
+const id = document.getElementById('editClienteId').value;
+
+const dados = {
+nome: document.getElementById('cNome').value.trim(),
+cpf_cnpj: document.getElementById('cCpfCnpj').value.trim(),
+telefone: document.getElementById('cTelefone').value.trim(),
+email: document.getElementById('cEmail').value.trim(),
+endereco: document.getElementById('cEndereco').value.trim()
+};
+
+if (id) {
+const { error } = await supabaseClient
+.from('clientes')
+.update(dados)
+.eq('id', id);
+
+
+if (error) {
+  console.error(error);
+  toast('Erro ao atualizar cliente');
+  return;
 }
+
+toast('Cliente atualizado!', 'success');
+
+
+} else {
+const { error } = await supabaseClient
+.from('clientes')
+.insert([dados]);
+
+if (error) {
+  console.error(error);
+  toast('Erro ao cadastrar cliente');
+  return;
+}
+
+toast('Cliente cadastrado!', 'success');
+
+}
+
+await carregarClientesSupabase();
+popularClientesForms();
+renderClientes();
+fecharModalClienteForce();
+}
+
 
 function excluirCliente(id) {
   const c = state.clientes.find(x => x.id === id);
