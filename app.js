@@ -189,6 +189,21 @@ function configurarCamposMoeda() {
 }
 
 // ===== PERSISTÊNCIA =====
+async function carregarClientesSupabase() {
+const { data, error } = await supabaseClient
+.from('clientes')
+.select('*')
+.order('created_at', { ascending: false });
+
+if (error) {
+console.error('Erro ao carregar clientes:', error);
+return;
+}
+
+state.clientes = data || [];
+renderClientes();
+}
+
 function salvarStorage() {
   localStorage.setItem('fng_state', JSON.stringify(state));
 }
@@ -1982,6 +1997,7 @@ function init() {
   if (state.cobrancas.length === 0) carregarDemo();
 
   popularClientesForms();
+  carregarClientesSupabase();
 
   // Event listeners do nav
   document.querySelectorAll('.nav-item').forEach(item => {
