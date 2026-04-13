@@ -1,5 +1,10 @@
 /* ===== Financeiro NG — app.js ===== */
 
+const supabaseUrl ="https://gcucadlnxttlxckravui.supabase.co"
+const supabaseKey = "sb_publishable_5i0somnwIAvyLNImLSWYxg_yogC3bCb"
+
+const supabaseClient = supabase.createClient(supabaseUrl, supabaseKey);
+
 // ===== STATE =====
 let state = {
   cobrancas: [],
