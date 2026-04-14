@@ -31,13 +31,10 @@ async function login() {
   const email = document.getElementById('loginEmail').value.trim();
   const senha = document.getElementById('loginSenha').value.trim();
 
-  const { data, error } = await supabaseClient.auth.signInWithPassword({
+  const { error } = await supabaseClient.auth.signInWithPassword({
     email: email,
     password: senha
   });
-
-  console.log('Login:', data);
-  console.log('Erro login:', error);
 
   if (error) {
     alert(error.message);
@@ -46,17 +43,24 @@ async function login() {
 
   document.getElementById('loginScreen').style.display = 'none';
   document.getElementById('app').style.display = 'block';
+  await carregarDadosSupabase();
+  atualizarStatusAuto();
+  atualizarStatusAutoCP();
+  popularClientesForms();
+  navegarPara('dashboard');
 }
 
 async function verificarSessao() {
   const { data } = await supabaseClient.auth.getSession();
 
-  const usuarioAtual = data.session?.user;
-console.log(usuarioAtual);
-
   if (data.session) {
     document.getElementById('loginScreen').style.display = 'none';
     document.getElementById('app').style.display = 'block';
+    await carregarDadosSupabase();
+    atualizarStatusAuto();
+    atualizarStatusAutoCP();
+    popularClientesForms();
+    navegarPara('dashboard');
   } else {
     document.getElementById('loginScreen').style.display = 'flex';
     document.getElementById('app').style.display = 'none';
@@ -252,64 +256,120 @@ function configurarCamposMoeda() {
   });
 }
 
-// ===== PERSISTÊNCIA =====
-async function carregarClientesSupabase() {
-  const { data: sessao } = await supabaseClient.auth.getSession();
-  const userId = sessao.session.user.id;
+// ===== PERSISTÊNCIA SUPABASE =====
 
-  const { data, error } = await supabaseClient
-    .from('clientes')
-    .select('*')
-    .eq('user_id', userId)
-    .order('created_at', { ascending: false });
-
-  if (error) {
-    console.error('Erro ao carregar clientes:', error);
-    return;
-  }
-
-  state.clientes = data || [];
-  renderClientes();
+async function getUserId() {
+  const { data } = await supabaseClient.auth.getSession();
+  return data.session?.user?.id;
 }
 
-
-function salvarStorage() {
-  localStorage.setItem('fng_state', JSON.stringify(state));
+// --- Mappers: Cobranças ---
+function cobrancaParaDb(c, userId) {
+  return {
+    id: c.id, user_id: userId,
+    cliente_id: c.clienteId || null, cliente_nome: c.clienteNome || null,
+    descricao: c.descricao, valor: c.valor,
+    data_vencimento: c.dataVencimento, categoria: c.categoria || null,
+    recorrencia: c.recorrencia || 'nenhuma', observacoes: c.observacoes || null,
+    status: c.status, data_pagamento: c.dataPagamento || null,
+    valor_pago: c.valorPago != null ? c.valorPago : null,
+    criado_em: c.criadoEm || new Date().toISOString(),
+  };
+}
+function dbParaCobranca(row) {
+  return {
+    id: row.id, clienteId: row.cliente_id, clienteNome: row.cliente_nome,
+    descricao: row.descricao, valor: Number(row.valor),
+    dataVencimento: row.data_vencimento, categoria: row.categoria,
+    recorrencia: row.recorrencia, observacoes: row.observacoes, status: row.status,
+    dataPagamento: row.data_pagamento,
+    valorPago: row.valor_pago != null ? Number(row.valor_pago) : null,
+    criadoEm: row.criado_em,
+  };
 }
 
-function carregarStorage() {
-  const raw = localStorage.getItem('fng_state');
-  if (raw) {
-    try {
-      const s = JSON.parse(raw);
-      state.cobrancas = s.cobrancas || [];
-      state.categorias = s.categorias || state.categorias;
+// --- Mappers: Despesas ---
+function despesaParaDb(d, userId) {
+  return {
+    id: d.id, user_id: userId, cliente_id: d.clienteId || null,
+    descricao: d.descricao, data: d.data, valor: d.valor,
+    observacoes: d.observacoes || null, status: d.status,
+    criado_em: d.criadoEm || new Date().toISOString(),
+  };
+}
+function dbParaDespesa(row) {
+  return {
+    id: row.id, clienteId: row.cliente_id, descricao: row.descricao,
+    data: row.data, valor: Number(row.valor), observacoes: row.observacoes,
+    status: row.status, criadoEm: row.criado_em,
+  };
+}
 
-      // Migração: substituir categorias genéricas antigas pelas de advocacia
-      const antigas = ['Aluguel', 'Utilities', 'Serviços'];
-      const temAntigas = antigas.some(n => state.categorias.find(c => c.nome === n));
-      const temNovas   = state.categorias.find(c => c.nome === 'Honorários de Êxito');
-      if (temAntigas && !temNovas) {
-        state.categorias = state.categorias.filter(c => !antigas.includes(c.nome));
-        state.categorias.unshift(
-          { nome: 'Honorários de Êxito',   cor: '#6366f1' },
-          { nome: 'Honorários Mensais',    cor: '#8b5cf6' },
-          { nome: 'Honorários Pro-Labore', cor: '#a855f7' },
-        );
-        if (!state.categorias.find(c => c.nome === 'Custas'))
-          state.categorias.splice(3, 0, { nome: 'Custas', cor: '#3b82f6' });
-        if (!state.categorias.find(c => c.nome === 'Diligências'))
-          state.categorias.splice(4, 0, { nome: 'Diligências', cor: '#06b6d4' });
-      }
-      state.clientes = s.clientes || [];
-      state.despesas = s.despesas || [];
-      state.contasPagar = s.contasPagar || [];
-      state.contadores = { notaDebito: 0, recibo: 0, ...(s.contadores || {}) };
-      state.config = { ...state.config, ...(s.config || {}) };
-    } catch (e) {
-      console.warn('Erro ao carregar dados:', e);
-    }
+// --- Mappers: Contas a Pagar ---
+function contaPagarParaDb(cp, userId) {
+  return {
+    id: cp.id, user_id: userId, descricao: cp.descricao, tipo: cp.tipo || null,
+    data_vencimento: cp.dataVencimento, valor: cp.valor,
+    recorrencia: cp.recorrencia || 'nenhuma', observacoes: cp.observacoes || null,
+    status: cp.status, data_pagamento: cp.dataPagamento || null,
+    valor_pago: cp.valorPago != null ? cp.valorPago : null,
+    criado_em: cp.criadoEm || new Date().toISOString(),
+  };
+}
+function dbParaContaPagar(row) {
+  return {
+    id: row.id, descricao: row.descricao, tipo: row.tipo,
+    dataVencimento: row.data_vencimento, valor: Number(row.valor),
+    recorrencia: row.recorrencia, observacoes: row.observacoes, status: row.status,
+    dataPagamento: row.data_pagamento,
+    valorPago: row.valor_pago != null ? Number(row.valor_pago) : null,
+    criadoEm: row.criado_em,
+  };
+}
+
+// Carrega todos os dados do usuário do Supabase
+async function carregarDadosSupabase() {
+  const userId = await getUserId();
+  if (!userId) return;
+
+  const [resCobrancas, resDespesas, resCP, resClientes, resConfig] = await Promise.all([
+    supabaseClient.from('cobrancas').select('*').eq('user_id', userId).order('data_vencimento', { ascending: true }),
+    supabaseClient.from('despesas').select('*').eq('user_id', userId).order('data', { ascending: false }),
+    supabaseClient.from('contas_pagar').select('*').eq('user_id', userId).order('data_vencimento', { ascending: true }),
+    supabaseClient.from('clientes').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
+    supabaseClient.from('user_config').select('*').eq('user_id', userId).maybeSingle(),
+  ]);
+
+  if (resCobrancas.error) console.error('Erro ao carregar cobranças:', resCobrancas.error);
+  else state.cobrancas = (resCobrancas.data || []).map(dbParaCobranca);
+
+  if (resDespesas.error) console.error('Erro ao carregar despesas:', resDespesas.error);
+  else state.despesas = (resDespesas.data || []).map(dbParaDespesa);
+
+  if (resCP.error) console.error('Erro ao carregar contas a pagar:', resCP.error);
+  else state.contasPagar = (resCP.data || []).map(dbParaContaPagar);
+
+  if (resClientes.error) console.error('Erro ao carregar clientes:', resClientes.error);
+  else state.clientes = resClientes.data || [];
+
+  if (resConfig.data) {
+    state.categorias = resConfig.data.categorias || state.categorias;
+    state.config = { ...state.config, ...(resConfig.data.config || {}) };
+    state.contadores = { ...state.contadores, ...(resConfig.data.contadores || {}) };
   }
+}
+
+// Salva categorias, config e contadores no Supabase
+async function salvarConfigSupabase() {
+  const userId = await getUserId();
+  if (!userId) return;
+  const { error } = await supabaseClient.from('user_config').upsert([{
+    user_id: userId,
+    categorias: state.categorias,
+    config: state.config,
+    contadores: state.contadores,
+  }]);
+  if (error) console.error('Erro ao salvar configurações:', error);
 }
 
 // ===== STATUS AUTO =====
@@ -775,12 +835,19 @@ function salvarCobranca(event) {
     if (idx !== -1) {
       state.cobrancas[idx] = { ...state.cobrancas[idx], clienteId, clienteNome, descricao, valor, dataVencimento, categoria, recorrencia, observacoes };
       atualizarStatusAuto();
+      const atualizado = state.cobrancas[idx];
+      getUserId().then(userId => {
+        supabaseClient.from('cobrancas').update(cobrancaParaDb(atualizado, userId)).eq('id', id).then(({ error }) => {
+          if (error) console.error('Erro ao atualizar cobrança:', error);
+        });
+      });
     }
     toast('Cobrança atualizada!', 'success');
   } else {
     // Criar (com recorrência)
     const qtd = recorrencia !== 'nenhuma' ? repeticoes : 1;
     let base = new Date(dataVencimento + 'T00:00:00');
+    const novasCobrancas = [];
 
     for (let i = 0; i < qtd; i++) {
       const d = new Date(base);
@@ -802,14 +869,19 @@ function salvarCobranca(event) {
       };
       novaC.status = calcularStatus(novaC);
       state.cobrancas.push(novaC);
+      novasCobrancas.push(novaC);
 
       // Avançar data conforme recorrência
       base = proximaData(base, recorrencia);
     }
+    getUserId().then(userId => {
+      supabaseClient.from('cobrancas').insert(novasCobrancas.map(c => cobrancaParaDb(c, userId))).then(({ error }) => {
+        if (error) console.error('Erro ao inserir cobranças:', error);
+      });
+    });
     toast(`${qtd} cobrança${qtd !== 1 ? 's' : ''} criada${qtd !== 1 ? 's' : ''}!`, 'success');
   }
 
-  salvarStorage();
   fecharModalForce();
   if (viewAtual === 'dashboard') renderDashboard();
   else if (viewAtual === 'cobrancas') renderCobrancas();
@@ -834,7 +906,9 @@ function excluirCobranca(id) {
   if (!c) return;
   if (!confirm(`Excluir "${c.descricao}"?`)) return;
   state.cobrancas = state.cobrancas.filter(x => x.id !== id);
-  salvarStorage();
+  supabaseClient.from('cobrancas').delete().eq('id', id).then(({ error }) => {
+    if (error) console.error('Erro ao excluir cobrança:', error);
+  });
   renderCobrancas();
   toast('Cobrança excluída');
 }
@@ -878,7 +952,14 @@ function confirmarBaixa() {
   lista[idx].dataPagamento = dataPag;
   lista[idx].valorPago = valorPago;
   if (obs) lista[idx].observacoes = obs;
-  salvarStorage();
+  const itemAtualizado = lista[idx];
+  const tabela = baixaColecao === 'contaspagar' ? 'contas_pagar' : 'cobrancas';
+  const toDb = baixaColecao === 'contaspagar' ? contaPagarParaDb : cobrancaParaDb;
+  getUserId().then(userId => {
+    supabaseClient.from(tabela).update(toDb(itemAtualizado, userId)).eq('id', itemAtualizado.id).then(({ error }) => {
+      if (error) console.error('Erro ao registrar pagamento:', error);
+    });
+  });
   fecharModalBaixaForce();
   toast('Pagamento registrado!', 'success');
   if (viewAtual === 'dashboard') renderDashboard();
@@ -894,7 +975,11 @@ function desfazerBaixa(id) {
   state.cobrancas[idx].dataPagamento = null;
   state.cobrancas[idx].valorPago = null;
   atualizarStatusAuto();
-  salvarStorage();
+  getUserId().then(userId => {
+    supabaseClient.from('cobrancas').update(cobrancaParaDb(state.cobrancas[idx], userId)).eq('id', id).then(({ error }) => {
+      if (error) console.error('Erro ao desfazer baixa:', error);
+    });
+  });
   renderCobrancas();
   toast('Baixa desfeita');
 }
@@ -1143,7 +1228,7 @@ function adicionarCategoria() {
     return;
   }
   state.categorias.push({ nome, cor });
-  salvarStorage();
+  salvarConfigSupabase();
   renderCategorias();
   popularCategoriasForms();
   document.getElementById('novaCategoria').value = '';
@@ -1154,7 +1239,7 @@ function removerCategoria(idx) {
   const cat = state.categorias[idx];
   if (!confirm(`Remover categoria "${cat.nome}"?`)) return;
   state.categorias.splice(idx, 1);
-  salvarStorage();
+  salvarConfigSupabase();
   renderCategorias();
   toast('Categoria removida');
 }
@@ -1163,7 +1248,7 @@ function salvarConfig() {
   const dias = parseInt(document.getElementById('diasAlerta').value);
   if (!dias || dias < 1) { toast('Informe um número válido de dias', 'error'); return; }
   state.config.diasAlerta = dias;
-  salvarStorage();
+  salvarConfigSupabase();
   toast('Configurações salvas!', 'success');
 }
 
@@ -1239,7 +1324,14 @@ function importarDados(event) {
       state.cobrancas = dados.cobrancas;
       state.categorias = dados.categorias || state.categorias;
       state.config = { ...state.config, ...(dados.config || {}) };
-      salvarStorage();
+      getUserId().then(userId => {
+        supabaseClient.from('cobrancas').delete().neq('id', '').eq('user_id', userId).then(() => {
+          supabaseClient.from('cobrancas').insert(state.cobrancas.map(c => cobrancaParaDb(c, userId))).then(({ error }) => {
+            if (error) console.error('Erro ao importar cobranças:', error);
+          });
+        });
+      });
+      salvarConfigSupabase();
       navegarPara('dashboard');
       toast('Dados importados!', 'success');
     } catch (err) {
@@ -1250,8 +1342,16 @@ function importarDados(event) {
   reader.readAsText(file);
 }
 
-function limparDados() {
+async function limparDados() {
   if (!confirm('Apagar TODOS os dados? Esta ação não pode ser desfeita.')) return;
+  const userId = await getUserId();
+  if (userId) {
+    await Promise.all([
+      supabaseClient.from('cobrancas').delete().eq('user_id', userId),
+      supabaseClient.from('despesas').delete().eq('user_id', userId),
+      supabaseClient.from('contas_pagar').delete().eq('user_id', userId),
+    ]);
+  }
   state.cobrancas = [];
   state.clientes = [];
   state.despesas = [];
@@ -1266,7 +1366,7 @@ function limparDados() {
     { nome: 'Impostos',              cor: '#ef4444' },
     { nome: 'Outros',                cor: '#6b7280' },
   ];
-  salvarStorage();
+  salvarConfigSupabase();
   navegarPara('dashboard');
   toast('Dados apagados');
 }
@@ -1283,37 +1383,6 @@ function toast(msg, tipo = '') {
   el.className = 'toast show' + (tipo ? ' ' + tipo : '');
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => { el.className = 'toast'; }, 3000);
-}
-
-// ===== DADOS DE DEMONSTRAÇÃO =====
-function carregarDemo() {
-  const agora = new Date();
-  const ano = agora.getFullYear();
-  const mes = agora.getMonth() + 1;
-
-  function d(diaOffset, mOffset = 0) {
-    const dt = new Date(agora);
-    dt.setMonth(dt.getMonth() + mOffset);
-    dt.setDate(diaOffset);
-    return dt.toISOString().slice(0, 10);
-  }
-
-  state.cobrancas = [
-    { id: uid(), descricao: 'Aluguel Comercial', valor: 3500, dataVencimento: d(5), categoria: 'Aluguel', recorrencia: 'mensal', status: 'pendente', dataPagamento: null, valorPago: null, observacoes: '', criadoEm: new Date().toISOString() },
-    { id: uid(), descricao: 'Conta de Energia', valor: 480.50, dataVencimento: d(10), categoria: 'Utilities', recorrencia: 'mensal', status: 'pendente', dataPagamento: null, valorPago: null, observacoes: '', criadoEm: new Date().toISOString() },
-    { id: uid(), descricao: 'Internet Fibra', valor: 129.90, dataVencimento: d(15), categoria: 'Utilities', recorrencia: 'mensal', status: 'pendente', dataPagamento: null, valorPago: null, observacoes: '', criadoEm: new Date().toISOString() },
-    { id: uid(), descricao: 'Software Gestão', valor: 299, dataVencimento: d(20), categoria: 'Serviços', recorrencia: 'mensal', status: 'pendente', dataPagamento: null, valorPago: null, observacoes: 'Renovação anual', criadoEm: new Date().toISOString() },
-    { id: uid(), descricao: 'Alvará Municipal', valor: 850, dataVencimento: d(-3), categoria: 'Impostos', recorrencia: 'anual', status: 'vencido', dataPagamento: null, valorPago: null, observacoes: '', criadoEm: new Date().toISOString() },
-    { id: uid(), descricao: 'DAS Simples Nacional', valor: 620, dataVencimento: d(-8), categoria: 'Impostos', recorrencia: 'mensal', status: 'vencido', dataPagamento: null, valorPago: null, observacoes: '', criadoEm: new Date().toISOString() },
-    { id: uid(), descricao: 'Manutenção Ar-Cond', valor: 350, dataVencimento: d(-15, -1), categoria: 'Serviços', recorrencia: 'nenhuma', status: 'pago', dataPagamento: d(-14, -1), valorPago: 350, observacoes: '', criadoEm: new Date().toISOString() },
-    { id: uid(), descricao: 'Aluguel Comercial', valor: 3500, dataVencimento: d(5, -1), categoria: 'Aluguel', recorrencia: 'mensal', status: 'pago', dataPagamento: d(4, -1), valorPago: 3500, observacoes: '', criadoEm: new Date().toISOString() },
-    { id: uid(), descricao: 'Conta de Energia', valor: 510, dataVencimento: d(10, -1), categoria: 'Utilities', recorrencia: 'mensal', status: 'pago', dataPagamento: d(9, -1), valorPago: 510, observacoes: '', criadoEm: new Date().toISOString() },
-    { id: uid(), descricao: 'Aluguel Comercial', valor: 3500, dataVencimento: d(5, 1), categoria: 'Aluguel', recorrencia: 'mensal', status: 'pendente', dataPagamento: null, valorPago: null, observacoes: '', criadoEm: new Date().toISOString() },
-    { id: uid(), descricao: 'Seguro Empresarial', valor: 1200, dataVencimento: d(28), categoria: 'Outros', recorrencia: 'anual', status: 'pendente', dataPagamento: null, valorPago: null, observacoes: '', criadoEm: new Date().toISOString() },
-    { id: uid(), descricao: 'Contador', valor: 750, dataVencimento: d(25), categoria: 'Serviços', recorrencia: 'mensal', status: 'pendente', dataPagamento: null, valorPago: null, observacoes: '', criadoEm: new Date().toISOString() },
-  ];
-  atualizarStatusAuto();
-  salvarStorage();
 }
 
 // ===== CONTAS A PAGAR =====
@@ -1501,21 +1570,33 @@ function salvarContaPagar(event) {
     if (idx !== -1) {
       state.contasPagar[idx] = { ...state.contasPagar[idx], descricao, tipo, dataVencimento, valor, recorrencia, observacoes };
       atualizarStatusAutoCP();
+      const atualizado = state.contasPagar[idx];
+      getUserId().then(userId => {
+        supabaseClient.from('contas_pagar').update(contaPagarParaDb(atualizado, userId)).eq('id', id).then(({ error }) => {
+          if (error) console.error('Erro ao atualizar conta a pagar:', error);
+        });
+      });
     }
     toast('Conta atualizada!', 'success');
   } else {
     const qtd = recorrencia !== 'nenhuma' ? repeticoes : 1;
     let base = new Date(dataVencimento + 'T00:00:00');
+    const novasCP = [];
     for (let i = 0; i < qtd; i++) {
       const dStr = base.toISOString().slice(0, 10);
       const novaCP = { id: uid(), descricao, tipo, dataVencimento: dStr, valor, recorrencia, observacoes, status: 'pendente', dataPagamento: null, valorPago: null, criadoEm: new Date().toISOString() };
       novaCP.status = calcularStatusCP(novaCP);
       state.contasPagar.push(novaCP);
+      novasCP.push(novaCP);
       base = proximaData(base, recorrencia);
     }
+    getUserId().then(userId => {
+      supabaseClient.from('contas_pagar').insert(novasCP.map(cp => contaPagarParaDb(cp, userId))).then(({ error }) => {
+        if (error) console.error('Erro ao inserir contas a pagar:', error);
+      });
+    });
     toast(`${qtd > 1 ? qtd + ' contas criadas' : 'Conta criada'}!`, 'success');
   }
-  salvarStorage();
   fecharModalCPForce();
   if (viewAtual === 'contaspagar') renderContasPagar();
   if (viewAtual === 'dashboard') renderDashboard();
@@ -1526,7 +1607,9 @@ function excluirContaPagar(id) {
   if (!cp) return;
   if (!confirm(`Excluir "${cp.descricao}"?`)) return;
   state.contasPagar = state.contasPagar.filter(x => x.id !== id);
-  salvarStorage();
+  supabaseClient.from('contas_pagar').delete().eq('id', id).then(({ error }) => {
+    if (error) console.error('Erro ao excluir conta a pagar:', error);
+  });
   renderContasPagar();
   toast('Conta excluída');
 }
@@ -1539,7 +1622,11 @@ function desfazerBaixaCP(id) {
   state.contasPagar[idx].dataPagamento = null;
   state.contasPagar[idx].valorPago = null;
   atualizarStatusAutoCP();
-  salvarStorage();
+  getUserId().then(userId => {
+    supabaseClient.from('contas_pagar').update(contaPagarParaDb(state.contasPagar[idx], userId)).eq('id', id).then(({ error }) => {
+      if (error) console.error('Erro ao desfazer baixa de conta a pagar:', error);
+    });
+  });
   renderContasPagar();
   toast('Baixa desfeita');
 }
@@ -1762,19 +1849,26 @@ toast('Cliente cadastrado!', 'success');
 
 }
 
-await carregarClientesSupabase();
+const { data: clientesAtualizados } = await supabaseClient
+  .from('clientes').select('*').eq('user_id', userId).order('created_at', { ascending: false });
+state.clientes = clientesAtualizados || [];
 popularClientesForms();
 renderClientes();
 fecharModalClienteForce();
 }
 
 
-function excluirCliente(id) {
+async function excluirCliente(id) {
   const c = state.clientes.find(x => x.id === id);
   if (!c) return;
   if (!confirm(`Excluir cliente "${c.nome}"?`)) return;
+  const { error } = await supabaseClient.from('clientes').delete().eq('id', id);
+  if (error) {
+    console.error('Erro ao excluir cliente:', error);
+    toast('Erro ao excluir cliente', 'error');
+    return;
+  }
   state.clientes = state.clientes.filter(x => x.id !== id);
-  salvarStorage();
   popularClientesForms();
   renderClientes();
   toast('Cliente excluído');
@@ -1891,13 +1985,25 @@ function salvarDespesa(event) {
   };
   if (id) {
     const idx = state.despesas.findIndex(d => d.id === id);
-    if (idx !== -1) state.despesas[idx] = { ...state.despesas[idx], ...dados };
+    if (idx !== -1) {
+      state.despesas[idx] = { ...state.despesas[idx], ...dados };
+      getUserId().then(userId => {
+        supabaseClient.from('despesas').update(despesaParaDb(state.despesas[idx], userId)).eq('id', id).then(({ error }) => {
+          if (error) console.error('Erro ao atualizar despesa:', error);
+        });
+      });
+    }
     toast('Despesa atualizada!', 'success');
   } else {
-    state.despesas.push({ id: uid(), ...dados, status: 'pendente', criadoEm: new Date().toISOString() });
+    const nova = { id: uid(), ...dados, status: 'pendente', criadoEm: new Date().toISOString() };
+    state.despesas.push(nova);
+    getUserId().then(userId => {
+      supabaseClient.from('despesas').insert([despesaParaDb(nova, userId)]).then(({ error }) => {
+        if (error) console.error('Erro ao inserir despesa:', error);
+      });
+    });
     toast('Despesa registrada!', 'success');
   }
-  salvarStorage();
   fecharModalDespesaForce();
   if (viewAtual === 'despesas') renderDespesas();
   if (viewAtual === 'clientes') renderClientes();
@@ -1906,7 +2012,9 @@ function salvarDespesa(event) {
 function excluirDespesa(id) {
   if (!confirm('Excluir esta despesa?')) return;
   state.despesas = state.despesas.filter(d => d.id !== id);
-  salvarStorage();
+  supabaseClient.from('despesas').delete().eq('id', id).then(({ error }) => {
+    if (error) console.error('Erro ao excluir despesa:', error);
+  });
   renderDespesas();
   toast('Despesa excluída');
 }
@@ -1915,7 +2023,11 @@ function marcarDespesaFaturada(id) {
   const idx = state.despesas.findIndex(d => d.id === id);
   if (idx === -1) return;
   state.despesas[idx].status = 'faturado';
-  salvarStorage();
+  getUserId().then(userId => {
+    supabaseClient.from('despesas').update(despesaParaDb(state.despesas[idx], userId)).eq('id', id).then(({ error }) => {
+      if (error) console.error('Erro ao marcar despesa como faturada:', error);
+    });
+  });
   renderDespesas();
   toast('Despesa marcada como faturada', 'success');
 }
@@ -1939,7 +2051,7 @@ function gerarNotaDebito(clienteId) {
   }
 
   state.contadores.notaDebito = (state.contadores.notaDebito || 0) + 1;
-  salvarStorage();
+  salvarConfigSupabase();
   const numero = String(state.contadores.notaDebito).padStart(4, '0');
   const total = itens.reduce((s, i) => s + i.valor, 0);
 
@@ -2014,9 +2126,15 @@ function gerarNotaDebito(clienteId) {
   // Marcar despesas incluídas como faturadas
   despesas.forEach(d => {
     const idx = state.despesas.findIndex(x => x.id === d.id);
-    if (idx !== -1) state.despesas[idx].status = 'faturado';
+    if (idx !== -1) {
+      state.despesas[idx].status = 'faturado';
+      getUserId().then(userId => {
+        supabaseClient.from('despesas').update(despesaParaDb(state.despesas[idx], userId)).eq('id', d.id).then(({ error }) => {
+          if (error) console.error('Erro ao marcar despesa como faturada:', error);
+        });
+      });
+    }
   });
-  salvarStorage();
 
   document.getElementById('printOverlay').classList.add('open');
 }
@@ -2027,7 +2145,7 @@ function gerarRecibo(cobrancaId) {
   if (!c || c.status !== 'pago') return;
 
   state.contadores.recibo = (state.contadores.recibo || 0) + 1;
-  salvarStorage();
+  salvarConfigSupabase();
   const numero = String(state.contadores.recibo).padStart(4, '0');
   const cliente = c.clienteId ? state.clientes.find(x => x.id === c.clienteId) : null;
   const valorPago = c.valorPago || c.valor;
@@ -2093,14 +2211,7 @@ function fecharPrintOverlay() {
 
 // ===== INIT =====
 function init() {
-  carregarStorage();
   configurarCamposMoeda();
-
-  // Se não tem dados, carrega demo
-  if (state.cobrancas.length === 0) carregarDemo();
-
-  popularClientesForms();
-  carregarClientesSupabase();
 
   // Event listeners do nav
   document.querySelectorAll('.nav-item').forEach(item => {
@@ -2117,19 +2228,6 @@ function init() {
 
   // Event listener recorrência modal
   document.getElementById('fRecorrencia').addEventListener('change', toggleRepetir);
-
-  navegarPara('dashboard');
 }
 
 document.addEventListener('DOMContentLoaded', init);
-
-async function testarSupabase() {
-const { data, error } = await supabaseClient
-.from('clientes')
-.select('*');
-
-console.log('Clientes:', data);
-console.log('Erro:', error);
-}
-
-testarSupabase();
