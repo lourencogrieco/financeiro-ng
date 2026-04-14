@@ -254,23 +254,24 @@ function configurarCamposMoeda() {
 
 // ===== PERSISTÊNCIA =====
 async function carregarClientesSupabase() {
-const { data, error } = await supabaseClient
-.from('clientes')
-.select('*')
-.order('created_at', { ascending: false });
+  const { data: sessao } = await supabaseClient.auth.getSession();
+  const userId = sessao.session.user.id;
 
-if (error) {
-console.error('Erro ao carregar clientes:', error);
-return;
+  const { data, error } = await supabaseClient
+    .from('clientes')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Erro ao carregar clientes:', error);
+    return;
+  }
+
+  state.clientes = data || [];
+  renderClientes();
 }
 
-state.clientes = data || [];
-
-renderClientes();
-popularClientesForms();
-renderDashboard();
-
-}
 
 function salvarStorage() {
   localStorage.setItem('fng_state', JSON.stringify(state));
