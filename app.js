@@ -65,7 +65,7 @@ async function logout() {
 async function inicializarContextoEmpresa(user) {
   const { data: membro, error } = await supabaseClient
     .from('usuarios_empresa')
-    .select('role, nome, empresa_id, empresas(id, nome)')
+    .select('perfil, nome, empresa_id, empresas(id, nome)')
     .eq('user_id', user.id)
     .maybeSingle();
 
@@ -84,7 +84,7 @@ async function inicializarContextoEmpresa(user) {
     userId: user.id,
     email: user.email,
     nome: membro.nome || user.email,
-    role: membro.role,
+    perfil: membro.perfil,
   };
 
   document.getElementById('setupEmpresaScreen').style.display = 'none';
@@ -427,12 +427,12 @@ async function criarEmpresa() {
 
   const { error: eMembro } = await supabaseClient
     .from('usuarios_empresa')
-    .insert([{ empresa_id: empresa.id, user_id: user.id, nome: nomeUsuario, role: 'admin' }]);
+    .insert([{ empresa_id: empresa.id, user_id: user.id, nome: nomeUsuario, perfil: 'admin' }]);
   if (eMembro) { alert('Erro ao criar usuário: ' + eMembro.message); return; }
 
   state.empresaId = empresa.id;
   state.empresaNome = empresa.nome;
-  state.meuPerfil = { userId: user.id, email: user.email, nome: nomeUsuario, role: 'admin' };
+  state.meuPerfil = { userId: user.id, email: user.email, nome: nomeUsuario, perfil: 'admin' };
 
   document.getElementById('setupEmpresaScreen').style.display = 'none';
   document.getElementById('app').style.display = 'block';
@@ -463,7 +463,7 @@ async function entrarComCodigo() {
 
   const { error: eMembro } = await supabaseClient
     .from('usuarios_empresa')
-    .insert([{ empresa_id: convite.empresa_id, user_id: user.id, nome: nomeUsuario, role: 'operador' }]);
+    .insert([{ empresa_id: convite.empresa_id, user_id: user.id, nome: nomeUsuario, perfil: 'operador' }]);
   if (eMembro) { alert('Erro ao entrar na empresa: ' + eMembro.message); return; }
 
   await supabaseClient
@@ -476,7 +476,7 @@ async function entrarComCodigo() {
 
   state.empresaId = convite.empresa_id;
   state.empresaNome = empresa?.nome || '';
-  state.meuPerfil = { userId: user.id, email: user.email, nome: nomeUsuario, role: 'operador' };
+  state.meuPerfil = { userId: user.id, email: user.email, nome: nomeUsuario, perfil: 'operador' };
 
   document.getElementById('setupEmpresaScreen').style.display = 'none';
   document.getElementById('app').style.display = 'block';
@@ -490,7 +490,7 @@ async function entrarComCodigo() {
 
 function renderSidebarUser() {
   if (!state.meuPerfil) return;
-  const { nome, role } = state.meuPerfil;
+  const { nome, perfil } = state.meuPerfil;
   const iniciais = nome.split(' ').filter(Boolean).map(w => w[0]).join('').slice(0, 2).toUpperCase();
   const el = document.getElementById('sidebarUser');
   if (!el) return;
@@ -498,11 +498,11 @@ function renderSidebarUser() {
   document.getElementById('userAvatar').textContent = iniciais;
   document.getElementById('userNome').textContent = nome;
   document.getElementById('userEmpresa').textContent = state.empresaNome || '';
-  document.getElementById('userRole').textContent = role === 'admin' ? 'Admin' : 'Operador';
+  document.getElementById('userRole').textContent = perfil === 'admin' ? 'Admin' : 'Operador';
 }
 
 async function gerarConvite() {
-  if (state.meuPerfil?.role !== 'admin') {
+  if (state.meuPerfil?.perfil !== 'admin') {
     toast('Apenas administradores podem gerar convites.', 'error');
     return;
   }
@@ -530,7 +530,7 @@ async function renderEquipe() {
   if (!el || !state.empresaId) return;
 
   const { data: membros, error } = await supabaseClient
-    .from('usuariosempresa')
+    .from('usuarios_empresa')
     .select('*')
     .eq('empresa_id', state.empresaId)
     .order('criado_em', { ascending: true });
@@ -550,12 +550,12 @@ async function renderEquipe() {
           <div class="team-nome">${m.nome}${isMe ? ' <span style="font-size:11px;color:var(--text-muted)">(você)</span>' : ''}</div>
           <div class="team-desde">Desde ${fmtData(m.criado_em?.slice(0, 10))}</div>
         </div>
-        <span class="badge ${m.role === 'admin' ? 'badge-pago' : 'badge-pendente'}">${m.role === 'admin' ? 'Admin' : 'Operador'}</span>
+        <span class="badge ${m.perfil === 'admin' ? 'badge-pago' : 'badge-pendente'}">${m.perfil === 'admin' ? 'Admin' : 'Operador'}</span>
       </div>`;
   }).join('');
 
   const btn = document.getElementById('btnGerarConvite');
-  if (btn) btn.style.display = state.meuPerfil?.role === 'admin' ? '' : 'none';
+  if (btn) btn.style.display = state.meuPerfil?.perfil === 'admin' ? '' : 'none';
 }
 
 // ===== STATUS AUTO =====
