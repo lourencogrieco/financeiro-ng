@@ -638,19 +638,185 @@ form { padding: 20px 24px 0; }
 .toast.success { border-left: 3px solid var(--success); }
 .toast.error { border-left: 3px solid var(--danger); }
 
+/* ===== Sidebar User ===== */
+.sidebar-user {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  margin: auto 10px 4px;
+  border-radius: var(--radius);
+  background: rgba(255,255,255,.05);
+  min-width: 0;
+}
+
+.user-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--primary);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+}
+
+.user-info { flex: 1; min-width: 0; }
+
+.user-nome {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #e2e8f0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.user-empresa {
+  font-size: 11px;
+  color: #475569;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.user-role {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .8px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: rgba(99,102,241,.25);
+  color: #a5b4fc;
+  flex-shrink: 0;
+}
+
 /* ===== Sidebar logout ===== */
 .sidebar > .btn-outline {
-  margin: auto 12px 16px;
-  color: #94a3b8;
-  border-color: rgba(255,255,255,.12);
+  margin: 6px 10px 14px;
+  color: #64748b;
+  border-color: rgba(255,255,255,.08);
   background: transparent;
-  font-size: 13px;
+  font-size: 12.5px;
+  justify-content: center;
 }
 .sidebar > .btn-outline:hover {
   background: rgba(255,255,255,.07);
-  color: #fff;
-  border-color: rgba(255,255,255,.2);
+  color: #94a3b8;
+  border-color: rgba(255,255,255,.15);
 }
+
+/* ===== Setup Empresa Screen ===== */
+.setup-empresa-screen {
+  position: fixed;
+  inset: 0;
+  background: linear-gradient(135deg, #14162b 0%, #1d2040 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  z-index: 9998;
+}
+
+.setup-box {
+  width: 100%;
+  max-width: 440px;
+  background: #fff;
+  border-radius: 10px;
+  padding: 36px 40px;
+  box-shadow: 0 20px 60px rgba(0,0,0,.2);
+}
+
+.setup-logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+.setup-logo span { font-size: 15px; font-weight: 700; color: #111827; }
+
+.setup-box h2 { font-size: 22px; font-weight: 800; color: #111827; margin-bottom: 6px; }
+
+.setup-sub { font-size: 13px; color: #6b7280; margin-bottom: 20px; line-height: 1.55; }
+
+.setup-tabs {
+  display: flex;
+  border: 1px solid #e5e7eb;
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 20px;
+}
+
+.setup-tab {
+  flex: 1;
+  padding: 9px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  border: none;
+  background: transparent;
+  color: #6b7280;
+  cursor: pointer;
+  transition: background-color .15s, color .15s;
+}
+.setup-tab.active { background: #6366f1; color: #fff; }
+.setup-tab:not(.active):hover { background: #f9fafb; }
+
+/* ===== Team List ===== */
+.team-member-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+.team-member-item:last-child { border-bottom: none; }
+
+.team-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--primary-light);
+  color: var(--primary);
+  font-size: 12px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  text-transform: uppercase;
+}
+
+.team-info { flex: 1; min-width: 0; }
+.team-nome { font-size: 13px; font-weight: 600; color: var(--text); }
+.team-desde { font-size: 12px; color: var(--text-muted); }
+
+/* ===== Invite Code ===== */
+.invite-code-box {
+  margin-top: 16px;
+  padding: 14px 16px;
+  background: var(--primary-light);
+  border: 1px solid #c7d2fe;
+  border-radius: var(--radius);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.invite-code {
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 4px;
+  color: var(--primary);
+}
+
+.invite-instructions { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
 
 /* ===== Recorrencia badge ===== */
 .rec-badge {

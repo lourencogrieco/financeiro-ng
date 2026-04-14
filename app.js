@@ -31,36 +31,18 @@ async function login() {
   const email = document.getElementById('loginEmail').value.trim();
   const senha = document.getElementById('loginSenha').value.trim();
 
-  const { error } = await supabaseClient.auth.signInWithPassword({
-    email: email,
-    password: senha
-  });
-
-  if (error) {
-    alert(error.message);
-    return;
-  }
+  const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password: senha });
+  if (error) { alert(error.message); return; }
 
   document.getElementById('loginScreen').style.display = 'none';
-  document.getElementById('app').style.display = 'block';
-  await carregarDadosSupabase();
-  atualizarStatusAuto();
-  atualizarStatusAutoCP();
-  popularClientesForms();
-  navegarPara('dashboard');
+  await inicializarContextoEmpresa(data.user);
 }
 
 async function verificarSessao() {
   const { data } = await supabaseClient.auth.getSession();
-
   if (data.session) {
     document.getElementById('loginScreen').style.display = 'none';
-    document.getElementById('app').style.display = 'block';
-    await carregarDadosSupabase();
-    atualizarStatusAuto();
-    atualizarStatusAutoCP();
-    popularClientesForms();
-    navegarPara('dashboard');
+    await inicializarContextoEmpresa(data.session.user);
   } else {
     document.getElementById('loginScreen').style.display = 'flex';
     document.getElementById('app').style.display = 'none';
@@ -71,13 +53,57 @@ verificarSessao();
 
 async function logout() {
   await supabaseClient.auth.signOut();
-
+  state.empresaId = null;
+  state.empresaNome = null;
+  state.meuPerfil = null;
   document.getElementById('app').style.display = 'none';
+  document.getElementById('setupEmpresaScreen').style.display = 'none';
   document.getElementById('loginScreen').style.display = 'flex';
+}
+
+// Após login: verifica se usuário já pertence a uma empresa
+async function inicializarContextoEmpresa(user) {
+  const { data: membro, error } = await supabaseClient
+    .from('membros_empresa')
+    .select('role, nome, empresa_id, empresas(id, nome)')
+    .eq('user_id', user.id)
+    .maybeSingle();
+
+  if (error) console.error('Erro ao buscar empresa:', error);
+
+  if (!membro) {
+    // Usuário ainda não tem empresa — mostrar tela de setup
+    document.getElementById('setupEmpresaScreen').style.display = 'flex';
+    document.getElementById('app').style.display = 'none';
+    return;
+  }
+
+  state.empresaId = membro.empresa_id;
+  state.empresaNome = membro.empresas?.nome || '';
+  state.meuPerfil = {
+    userId: user.id,
+    email: user.email,
+    nome: membro.nome || user.email,
+    role: membro.role,
+  };
+
+  document.getElementById('setupEmpresaScreen').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  renderSidebarUser();
+  await carregarDadosSupabase();
+  atualizarStatusAuto();
+  atualizarStatusAutoCP();
+  popularClientesForms();
+  navegarPara('dashboard');
 }
 
 // ===== STATE =====
 let state = {
+  // Contexto multi-empresa
+  empresaId: null,
+  empresaNome: null,
+  meuPerfil: null, // { userId, email, nome, role }
+
   cobrancas: [],
   categorias: [
     { nome: 'Honorários de Êxito',   cor: '#6366f1' },
@@ -258,15 +284,12 @@ function configurarCamposMoeda() {
 
 // ===== PERSISTÊNCIA SUPABASE =====
 
-async function getUserId() {
-  const { data } = await supabaseClient.auth.getSession();
-  return data.session?.user?.id;
-}
-
 // --- Mappers: Cobranças ---
-function cobrancaParaDb(c, userId) {
+function cobrancaParaDb(c) {
   return {
-    id: c.id, user_id: userId,
+    id: c.id,
+    empresa_id: state.empresaId,
+    user_id: state.meuPerfil?.userId,
     cliente_id: c.clienteId || null, cliente_nome: c.clienteNome || null,
     descricao: c.descricao, valor: c.valor,
     data_vencimento: c.dataVencimento, categoria: c.categoria || null,
@@ -289,9 +312,12 @@ function dbParaCobranca(row) {
 }
 
 // --- Mappers: Despesas ---
-function despesaParaDb(d, userId) {
+function despesaParaDb(d) {
   return {
-    id: d.id, user_id: userId, cliente_id: d.clienteId || null,
+    id: d.id,
+    empresa_id: state.empresaId,
+    user_id: state.meuPerfil?.userId,
+    cliente_id: d.clienteId || null,
     descricao: d.descricao, data: d.data, valor: d.valor,
     observacoes: d.observacoes || null, status: d.status,
     criado_em: d.criadoEm || new Date().toISOString(),
@@ -306,9 +332,12 @@ function dbParaDespesa(row) {
 }
 
 // --- Mappers: Contas a Pagar ---
-function contaPagarParaDb(cp, userId) {
+function contaPagarParaDb(cp) {
   return {
-    id: cp.id, user_id: userId, descricao: cp.descricao, tipo: cp.tipo || null,
+    id: cp.id,
+    empresa_id: state.empresaId,
+    user_id: state.meuPerfil?.userId,
+    descricao: cp.descricao, tipo: cp.tipo || null,
     data_vencimento: cp.dataVencimento, valor: cp.valor,
     recorrencia: cp.recorrencia || 'nenhuma', observacoes: cp.observacoes || null,
     status: cp.status, data_pagamento: cp.dataPagamento || null,
@@ -327,17 +356,16 @@ function dbParaContaPagar(row) {
   };
 }
 
-// Carrega todos os dados do usuário do Supabase
+// Carrega todos os dados da empresa do Supabase
 async function carregarDadosSupabase() {
-  const userId = await getUserId();
-  if (!userId) return;
+  if (!state.empresaId) return;
 
   const [resCobrancas, resDespesas, resCP, resClientes, resConfig] = await Promise.all([
-    supabaseClient.from('cobrancas').select('*').eq('user_id', userId).order('data_vencimento', { ascending: true }),
-    supabaseClient.from('despesas').select('*').eq('user_id', userId).order('data', { ascending: false }),
-    supabaseClient.from('contas_pagar').select('*').eq('user_id', userId).order('data_vencimento', { ascending: true }),
-    supabaseClient.from('clientes').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
-    supabaseClient.from('user_config').select('*').eq('user_id', userId).maybeSingle(),
+    supabaseClient.from('cobrancas').select('*').eq('empresa_id', state.empresaId).order('data_vencimento', { ascending: true }),
+    supabaseClient.from('despesas').select('*').eq('empresa_id', state.empresaId).order('data', { ascending: false }),
+    supabaseClient.from('contas_pagar').select('*').eq('empresa_id', state.empresaId).order('data_vencimento', { ascending: true }),
+    supabaseClient.from('clientes').select('*').eq('empresa_id', state.empresaId).order('created_at', { ascending: false }),
+    supabaseClient.from('user_config').select('*').eq('empresa_id', state.empresaId).maybeSingle(),
   ]);
 
   if (resCobrancas.error) console.error('Erro ao carregar cobranças:', resCobrancas.error);
@@ -361,15 +389,173 @@ async function carregarDadosSupabase() {
 
 // Salva categorias, config e contadores no Supabase
 async function salvarConfigSupabase() {
-  const userId = await getUserId();
-  if (!userId) return;
+  if (!state.empresaId) return;
   const { error } = await supabaseClient.from('user_config').upsert([{
-    user_id: userId,
+    empresa_id: state.empresaId,
+    user_id: state.meuPerfil?.userId,
     categorias: state.categorias,
     config: state.config,
     contadores: state.contadores,
   }]);
   if (error) console.error('Erro ao salvar configurações:', error);
+}
+
+// ===== EMPRESA / MULTI-TENANT =====
+
+function setupAba(aba) {
+  document.getElementById('setupCriar').style.display = aba === 'criar' ? '' : 'none';
+  document.getElementById('setupEntrar').style.display = aba === 'entrar' ? '' : 'none';
+  document.querySelectorAll('.setup-tab').forEach((t, i) => {
+    t.classList.toggle('active', (i === 0 && aba === 'criar') || (i === 1 && aba === 'entrar'));
+  });
+}
+
+async function criarEmpresa() {
+  const nome = document.getElementById('setupNomeEmpresa').value.trim();
+  const nomeUsuario = document.getElementById('setupNomeUsuarioCriar').value.trim();
+  if (!nome || !nomeUsuario) { alert('Preencha todos os campos.'); return; }
+
+  const { data: sessao } = await supabaseClient.auth.getSession();
+  const user = sessao.session.user;
+
+  const { data: empresa, error: eEmpresa } = await supabaseClient
+    .from('empresas')
+    .insert([{ nome, criado_por: user.id }])
+    .select()
+    .single();
+  if (eEmpresa) { alert('Erro ao criar empresa: ' + eEmpresa.message); return; }
+
+  const { error: eMembro } = await supabaseClient
+    .from('membros_empresa')
+    .insert([{ empresa_id: empresa.id, user_id: user.id, nome: nomeUsuario, role: 'admin' }]);
+  if (eMembro) { alert('Erro ao criar usuário: ' + eMembro.message); return; }
+
+  state.empresaId = empresa.id;
+  state.empresaNome = empresa.nome;
+  state.meuPerfil = { userId: user.id, email: user.email, nome: nomeUsuario, role: 'admin' };
+
+  document.getElementById('setupEmpresaScreen').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  renderSidebarUser();
+  await carregarDadosSupabase();
+  atualizarStatusAuto();
+  atualizarStatusAutoCP();
+  popularClientesForms();
+  navegarPara('dashboard');
+}
+
+async function entrarComCodigo() {
+  const codigo = document.getElementById('setupCodigo').value.trim().toUpperCase();
+  const nomeUsuario = document.getElementById('setupNomeUsuarioEntrar').value.trim();
+  if (!codigo || !nomeUsuario) { alert('Preencha todos os campos.'); return; }
+
+  const { data: sessao } = await supabaseClient.auth.getSession();
+  const user = sessao.session.user;
+
+  const { data: convite, error: eConvite } = await supabaseClient
+    .from('convites_empresa')
+    .select('*')
+    .eq('codigo', codigo)
+    .is('usado_por', null)
+    .maybeSingle();
+
+  if (eConvite || !convite) { alert('Código inválido ou já utilizado.'); return; }
+
+  const { error: eMembro } = await supabaseClient
+    .from('membros_empresa')
+    .insert([{ empresa_id: convite.empresa_id, user_id: user.id, nome: nomeUsuario, role: 'operador' }]);
+  if (eMembro) { alert('Erro ao entrar na empresa: ' + eMembro.message); return; }
+
+  await supabaseClient
+    .from('convites_empresa')
+    .update({ usado_por: user.id, usado_em: new Date().toISOString() })
+    .eq('id', convite.id);
+
+  const { data: empresa } = await supabaseClient
+    .from('empresas').select('nome').eq('id', convite.empresa_id).single();
+
+  state.empresaId = convite.empresa_id;
+  state.empresaNome = empresa?.nome || '';
+  state.meuPerfil = { userId: user.id, email: user.email, nome: nomeUsuario, role: 'operador' };
+
+  document.getElementById('setupEmpresaScreen').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  renderSidebarUser();
+  await carregarDadosSupabase();
+  atualizarStatusAuto();
+  atualizarStatusAutoCP();
+  popularClientesForms();
+  navegarPara('dashboard');
+}
+
+function renderSidebarUser() {
+  if (!state.meuPerfil) return;
+  const { nome, role } = state.meuPerfil;
+  const iniciais = nome.split(' ').filter(Boolean).map(w => w[0]).join('').slice(0, 2).toUpperCase();
+  const el = document.getElementById('sidebarUser');
+  if (!el) return;
+  el.style.display = 'flex';
+  document.getElementById('userAvatar').textContent = iniciais;
+  document.getElementById('userNome').textContent = nome;
+  document.getElementById('userEmpresa').textContent = state.empresaNome || '';
+  document.getElementById('userRole').textContent = role === 'admin' ? 'Admin' : 'Operador';
+}
+
+async function gerarConvite() {
+  if (state.meuPerfil?.role !== 'admin') {
+    toast('Apenas administradores podem gerar convites.', 'error');
+    return;
+  }
+  const { data: sessao } = await supabaseClient.auth.getSession();
+  const { data: convite, error } = await supabaseClient
+    .from('convites_empresa')
+    .insert([{ empresa_id: state.empresaId, criado_por: sessao.session.user.id }])
+    .select()
+    .single();
+  if (error) { toast('Erro ao gerar convite.', 'error'); return; }
+
+  const box = document.getElementById('conviteGerado');
+  box.style.display = 'flex';
+  box.innerHTML = `
+    <div style="flex:1">
+      <div class="invite-code">${convite.codigo}</div>
+      <div class="invite-instructions">Compartilhe este código. Ele só pode ser usado uma vez.</div>
+    </div>
+    <button class="btn btn-outline" onclick="navigator.clipboard.writeText('${convite.codigo}').then(() => toast('Código copiado!', 'success'))">Copiar</button>
+  `;
+}
+
+async function renderEquipe() {
+  const el = document.getElementById('listaEquipe');
+  if (!el || !state.empresaId) return;
+
+  const { data: membros, error } = await supabaseClient
+    .from('membros_empresa')
+    .select('*')
+    .eq('empresa_id', state.empresaId)
+    .order('criado_em', { ascending: true });
+
+  if (error || !membros?.length) {
+    el.innerHTML = '<div class="empty-state" style="padding:20px 0"><p>Nenhum membro.</p></div>';
+    return;
+  }
+
+  el.innerHTML = membros.map(m => {
+    const ini = m.nome.split(' ').filter(Boolean).map(w => w[0]).join('').slice(0, 2).toUpperCase();
+    const isMe = m.user_id === state.meuPerfil?.userId;
+    return `
+      <div class="team-member-item">
+        <div class="team-avatar">${ini}</div>
+        <div class="team-info">
+          <div class="team-nome">${m.nome}${isMe ? ' <span style="font-size:11px;color:var(--text-muted)">(você)</span>' : ''}</div>
+          <div class="team-desde">Desde ${fmtData(m.criado_em?.slice(0, 10))}</div>
+        </div>
+        <span class="badge ${m.role === 'admin' ? 'badge-pago' : 'badge-pendente'}">${m.role === 'admin' ? 'Admin' : 'Operador'}</span>
+      </div>`;
+  }).join('');
+
+  const btn = document.getElementById('btnGerarConvite');
+  if (btn) btn.style.display = state.meuPerfil?.role === 'admin' ? '' : 'none';
 }
 
 // ===== STATUS AUTO =====
@@ -836,10 +1022,8 @@ function salvarCobranca(event) {
       state.cobrancas[idx] = { ...state.cobrancas[idx], clienteId, clienteNome, descricao, valor, dataVencimento, categoria, recorrencia, observacoes };
       atualizarStatusAuto();
       const atualizado = state.cobrancas[idx];
-      getUserId().then(userId => {
-        supabaseClient.from('cobrancas').update(cobrancaParaDb(atualizado, userId)).eq('id', id).then(({ error }) => {
-          if (error) console.error('Erro ao atualizar cobrança:', error);
-        });
+      supabaseClient.from('cobrancas').update(cobrancaParaDb(atualizado)).eq('id', id).then(({ error }) => {
+        if (error) console.error('Erro ao atualizar cobrança:', error);
       });
     }
     toast('Cobrança atualizada!', 'success');
@@ -874,10 +1058,8 @@ function salvarCobranca(event) {
       // Avançar data conforme recorrência
       base = proximaData(base, recorrencia);
     }
-    getUserId().then(userId => {
-      supabaseClient.from('cobrancas').insert(novasCobrancas.map(c => cobrancaParaDb(c, userId))).then(({ error }) => {
-        if (error) console.error('Erro ao inserir cobranças:', error);
-      });
+    supabaseClient.from('cobrancas').insert(novasCobrancas.map(c => cobrancaParaDb(c))).then(({ error }) => {
+      if (error) console.error('Erro ao inserir cobranças:', error);
     });
     toast(`${qtd} cobrança${qtd !== 1 ? 's' : ''} criada${qtd !== 1 ? 's' : ''}!`, 'success');
   }
@@ -955,10 +1137,8 @@ function confirmarBaixa() {
   const itemAtualizado = lista[idx];
   const tabela = baixaColecao === 'contaspagar' ? 'contas_pagar' : 'cobrancas';
   const toDb = baixaColecao === 'contaspagar' ? contaPagarParaDb : cobrancaParaDb;
-  getUserId().then(userId => {
-    supabaseClient.from(tabela).update(toDb(itemAtualizado, userId)).eq('id', itemAtualizado.id).then(({ error }) => {
-      if (error) console.error('Erro ao registrar pagamento:', error);
-    });
+  supabaseClient.from(tabela).update(toDb(itemAtualizado)).eq('id', itemAtualizado.id).then(({ error }) => {
+    if (error) console.error('Erro ao registrar pagamento:', error);
   });
   fecharModalBaixaForce();
   toast('Pagamento registrado!', 'success');
@@ -975,10 +1155,8 @@ function desfazerBaixa(id) {
   state.cobrancas[idx].dataPagamento = null;
   state.cobrancas[idx].valorPago = null;
   atualizarStatusAuto();
-  getUserId().then(userId => {
-    supabaseClient.from('cobrancas').update(cobrancaParaDb(state.cobrancas[idx], userId)).eq('id', id).then(({ error }) => {
-      if (error) console.error('Erro ao desfazer baixa:', error);
-    });
+  supabaseClient.from('cobrancas').update(cobrancaParaDb(state.cobrancas[idx])).eq('id', id).then(({ error }) => {
+    if (error) console.error('Erro ao desfazer baixa:', error);
   });
   renderCobrancas();
   toast('Baixa desfeita');
@@ -1203,6 +1381,8 @@ function renderRelatorios() {
 function renderConfiguracoes() {
   document.getElementById('diasAlerta').value = state.config.diasAlerta || 7;
   renderCategorias();
+  renderEquipe();
+  document.getElementById('conviteGerado').style.display = 'none';
 }
 
 function renderCategorias() {
@@ -1324,11 +1504,9 @@ function importarDados(event) {
       state.cobrancas = dados.cobrancas;
       state.categorias = dados.categorias || state.categorias;
       state.config = { ...state.config, ...(dados.config || {}) };
-      getUserId().then(userId => {
-        supabaseClient.from('cobrancas').delete().neq('id', '').eq('user_id', userId).then(() => {
-          supabaseClient.from('cobrancas').insert(state.cobrancas.map(c => cobrancaParaDb(c, userId))).then(({ error }) => {
-            if (error) console.error('Erro ao importar cobranças:', error);
-          });
+      supabaseClient.from('cobrancas').delete().neq('id', '').eq('empresa_id', state.empresaId).then(() => {
+        supabaseClient.from('cobrancas').insert(state.cobrancas.map(c => cobrancaParaDb(c))).then(({ error }) => {
+          if (error) console.error('Erro ao importar cobranças:', error);
         });
       });
       salvarConfigSupabase();
@@ -1344,12 +1522,11 @@ function importarDados(event) {
 
 async function limparDados() {
   if (!confirm('Apagar TODOS os dados? Esta ação não pode ser desfeita.')) return;
-  const userId = await getUserId();
-  if (userId) {
+  if (state.empresaId) {
     await Promise.all([
-      supabaseClient.from('cobrancas').delete().eq('user_id', userId),
-      supabaseClient.from('despesas').delete().eq('user_id', userId),
-      supabaseClient.from('contas_pagar').delete().eq('user_id', userId),
+      supabaseClient.from('cobrancas').delete().eq('empresa_id', state.empresaId),
+      supabaseClient.from('despesas').delete().eq('empresa_id', state.empresaId),
+      supabaseClient.from('contas_pagar').delete().eq('empresa_id', state.empresaId),
     ]);
   }
   state.cobrancas = [];
@@ -1571,10 +1748,8 @@ function salvarContaPagar(event) {
       state.contasPagar[idx] = { ...state.contasPagar[idx], descricao, tipo, dataVencimento, valor, recorrencia, observacoes };
       atualizarStatusAutoCP();
       const atualizado = state.contasPagar[idx];
-      getUserId().then(userId => {
-        supabaseClient.from('contas_pagar').update(contaPagarParaDb(atualizado, userId)).eq('id', id).then(({ error }) => {
-          if (error) console.error('Erro ao atualizar conta a pagar:', error);
-        });
+      supabaseClient.from('contas_pagar').update(contaPagarParaDb(atualizado)).eq('id', id).then(({ error }) => {
+        if (error) console.error('Erro ao atualizar conta a pagar:', error);
       });
     }
     toast('Conta atualizada!', 'success');
@@ -1590,10 +1765,8 @@ function salvarContaPagar(event) {
       novasCP.push(novaCP);
       base = proximaData(base, recorrencia);
     }
-    getUserId().then(userId => {
-      supabaseClient.from('contas_pagar').insert(novasCP.map(cp => contaPagarParaDb(cp, userId))).then(({ error }) => {
-        if (error) console.error('Erro ao inserir contas a pagar:', error);
-      });
+    supabaseClient.from('contas_pagar').insert(novasCP.map(cp => contaPagarParaDb(cp))).then(({ error }) => {
+      if (error) console.error('Erro ao inserir contas a pagar:', error);
     });
     toast(`${qtd > 1 ? qtd + ' contas criadas' : 'Conta criada'}!`, 'success');
   }
@@ -1622,10 +1795,8 @@ function desfazerBaixaCP(id) {
   state.contasPagar[idx].dataPagamento = null;
   state.contasPagar[idx].valorPago = null;
   atualizarStatusAutoCP();
-  getUserId().then(userId => {
-    supabaseClient.from('contas_pagar').update(contaPagarParaDb(state.contasPagar[idx], userId)).eq('id', id).then(({ error }) => {
-      if (error) console.error('Erro ao desfazer baixa de conta a pagar:', error);
-    });
+  supabaseClient.from('contas_pagar').update(contaPagarParaDb(state.contasPagar[idx])).eq('id', id).then(({ error }) => {
+    if (error) console.error('Erro ao desfazer baixa de conta a pagar:', error);
   });
   renderContasPagar();
   toast('Baixa desfeita');
@@ -1803,16 +1974,14 @@ async function salvarCliente(event) {
 
   const id = document.getElementById('editClienteId').value;
 
-  const { data: sessao } = await supabaseClient.auth.getSession();
-  const userId = sessao.session.user.id;
-
   const dados = {
     nome: document.getElementById('cNome').value.trim(),
     cpf_cnpj: document.getElementById('cCpfCnpj').value.trim(),
     telefone: document.getElementById('cTelefone').value.trim(),
     email: document.getElementById('cEmail').value.trim(),
     endereco: document.getElementById('cEndereco').value.trim(),
-    user_id: userId
+    empresa_id: state.empresaId,
+    user_id: state.meuPerfil?.userId,
   };
 
 if (id) {
@@ -1850,7 +2019,7 @@ toast('Cliente cadastrado!', 'success');
 }
 
 const { data: clientesAtualizados } = await supabaseClient
-  .from('clientes').select('*').eq('user_id', userId).order('created_at', { ascending: false });
+  .from('clientes').select('*').eq('empresa_id', state.empresaId).order('created_at', { ascending: false });
 state.clientes = clientesAtualizados || [];
 popularClientesForms();
 renderClientes();
@@ -1987,20 +2156,16 @@ function salvarDespesa(event) {
     const idx = state.despesas.findIndex(d => d.id === id);
     if (idx !== -1) {
       state.despesas[idx] = { ...state.despesas[idx], ...dados };
-      getUserId().then(userId => {
-        supabaseClient.from('despesas').update(despesaParaDb(state.despesas[idx], userId)).eq('id', id).then(({ error }) => {
-          if (error) console.error('Erro ao atualizar despesa:', error);
-        });
+      supabaseClient.from('despesas').update(despesaParaDb(state.despesas[idx])).eq('id', id).then(({ error }) => {
+        if (error) console.error('Erro ao atualizar despesa:', error);
       });
     }
     toast('Despesa atualizada!', 'success');
   } else {
     const nova = { id: uid(), ...dados, status: 'pendente', criadoEm: new Date().toISOString() };
     state.despesas.push(nova);
-    getUserId().then(userId => {
-      supabaseClient.from('despesas').insert([despesaParaDb(nova, userId)]).then(({ error }) => {
-        if (error) console.error('Erro ao inserir despesa:', error);
-      });
+    supabaseClient.from('despesas').insert([despesaParaDb(nova)]).then(({ error }) => {
+      if (error) console.error('Erro ao inserir despesa:', error);
     });
     toast('Despesa registrada!', 'success');
   }
@@ -2023,10 +2188,8 @@ function marcarDespesaFaturada(id) {
   const idx = state.despesas.findIndex(d => d.id === id);
   if (idx === -1) return;
   state.despesas[idx].status = 'faturado';
-  getUserId().then(userId => {
-    supabaseClient.from('despesas').update(despesaParaDb(state.despesas[idx], userId)).eq('id', id).then(({ error }) => {
-      if (error) console.error('Erro ao marcar despesa como faturada:', error);
-    });
+  supabaseClient.from('despesas').update(despesaParaDb(state.despesas[idx])).eq('id', id).then(({ error }) => {
+    if (error) console.error('Erro ao marcar despesa como faturada:', error);
   });
   renderDespesas();
   toast('Despesa marcada como faturada', 'success');
@@ -2128,10 +2291,8 @@ function gerarNotaDebito(clienteId) {
     const idx = state.despesas.findIndex(x => x.id === d.id);
     if (idx !== -1) {
       state.despesas[idx].status = 'faturado';
-      getUserId().then(userId => {
-        supabaseClient.from('despesas').update(despesaParaDb(state.despesas[idx], userId)).eq('id', d.id).then(({ error }) => {
-          if (error) console.error('Erro ao marcar despesa como faturada:', error);
-        });
+      supabaseClient.from('despesas').update(despesaParaDb(state.despesas[idx])).eq('id', d.id).then(({ error }) => {
+        if (error) console.error('Erro ao marcar despesa como faturada:', error);
       });
     }
   });

@@ -9,6 +9,49 @@
 </head>
 <body>
 
+<!-- Setup Empresa Screen (aparece após login quando usuário não tem empresa) -->
+<div id="setupEmpresaScreen" class="setup-empresa-screen" style="display:none">
+  <div class="setup-box">
+    <div class="setup-logo">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="2.5"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+      <span>Financeiro NG</span>
+    </div>
+    <h2>Configure sua empresa</h2>
+    <p class="setup-sub">Crie um novo perfil de empresa ou entre com um código de convite de um colega.</p>
+
+    <div class="setup-tabs">
+      <button class="setup-tab active" onclick="setupAba('criar')">Criar empresa</button>
+      <button class="setup-tab" onclick="setupAba('entrar')">Entrar com código</button>
+    </div>
+
+    <div id="setupCriar">
+      <div class="form-group" style="margin-bottom:12px">
+        <label style="font-size:12px;font-weight:600;color:#6b7280;margin-bottom:4px;display:block">Nome da empresa</label>
+        <input type="text" class="input" id="setupNomeEmpresa" placeholder="Ex: Advocacia Silva & Associados" style="background:#f9fafb">
+      </div>
+      <div class="form-group" style="margin-bottom:18px">
+        <label style="font-size:12px;font-weight:600;color:#6b7280;margin-bottom:4px;display:block">Seu nome</label>
+        <input type="text" class="input" id="setupNomeUsuarioCriar" placeholder="Seu nome completo" style="background:#f9fafb">
+      </div>
+      <button class="btn btn-primary" style="width:100%;justify-content:center;height:44px;font-size:14px" onclick="criarEmpresa()">Criar empresa</button>
+    </div>
+
+    <div id="setupEntrar" style="display:none">
+      <div class="form-group" style="margin-bottom:12px">
+        <label style="font-size:12px;font-weight:600;color:#6b7280;margin-bottom:4px;display:block">Código de convite</label>
+        <input type="text" class="input" id="setupCodigo" placeholder="Ex: AB12CD34" style="background:#f9fafb;letter-spacing:2px;text-transform:uppercase;font-weight:700" maxlength="8">
+      </div>
+      <div class="form-group" style="margin-bottom:18px">
+        <label style="font-size:12px;font-weight:600;color:#6b7280;margin-bottom:4px;display:block">Seu nome</label>
+        <input type="text" class="input" id="setupNomeUsuarioEntrar" placeholder="Seu nome completo" style="background:#f9fafb">
+      </div>
+      <button class="btn btn-primary" style="width:100%;justify-content:center;height:44px;font-size:14px" onclick="entrarComCodigo()">Entrar na empresa</button>
+    </div>
+
+    <button class="btn btn-outline" style="width:100%;justify-content:center;margin-top:10px;color:#6b7280;border-color:#e5e7eb" onclick="logout()">Usar outra conta</button>
+  </div>
+</div>
+
 <div id="loginScreen" class="login-screen">
   <div class="login-box">
     <h2>Financeiro NG</h2>
@@ -33,6 +76,13 @@
 
 <!-- Sidebar -->
 <aside class="sidebar" id="sidebar">
+  <div class="usuario-logado">
+  <div class="usuario-avatar">LG</div>
+  <div>
+    <div id="usuarioLogadoNome">Usuário</div>
+    <div id="usuarioLogadoEmail">email@empresa.com</div>
+  </div>
+</div>
   <div class="sidebar-logo">
     <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
     <span>Financeiro NG</span>
@@ -67,6 +117,15 @@
       Configurações
     </a>
   </nav>
+  <!-- User Info -->
+  <div class="sidebar-user" id="sidebarUser" style="display:none">
+    <div class="user-avatar" id="userAvatar">?</div>
+    <div class="user-info">
+      <div class="user-nome" id="userNome">—</div>
+      <div class="user-empresa" id="userEmpresa">—</div>
+    </div>
+    <span class="user-role" id="userRole"></span>
+  </div>
   <button class="btn btn-outline" onclick="logout()">Sair</button>
 </aside>
 
@@ -333,6 +392,18 @@
         <input type="file" id="importFile" accept=".json" style="display:none" onchange="importarDados(event)">
         <button class="btn btn-danger" onclick="limparDados()">Limpar Todos os Dados</button>
       </div>
+    </section>
+
+    <section class="section" style="max-width:560px; margin-top:20px" id="secaoEquipe">
+      <div class="section-header">
+        <h2>Equipe</h2>
+        <button class="btn btn-outline" onclick="gerarConvite()" id="btnGerarConvite" style="display:none">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Gerar convite
+        </button>
+      </div>
+      <div id="listaEquipe"></div>
+      <div id="conviteGerado" class="invite-code-box" style="display:none"></div>
     </section>
   </div>
 
