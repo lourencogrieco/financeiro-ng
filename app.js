@@ -7,6 +7,61 @@ const supabaseClient = supabase.createClient(supabaseUrl, supabaseKey);
 console.log("Biblioteca Supabase:", supabase);
 console.log("Cliente Supabase:", supabaseClient);
 
+async function cadastrarUsuario() {
+  const email = document.getElementById('cadastroEmail').value.trim();
+  const senha = document.getElementById('cadastroSenha').value.trim();
+
+  const { data, error } = await supabaseClient.auth.signUp({
+    email: email,
+    password: senha
+  });
+
+  console.log('Cadastro:', data);
+  console.log('Erro:', error);
+
+  if (error) {
+    alert(error.message);
+    return;
+  }
+
+  alert('Usuário criado com sucesso. Verifique seu email.');
+}
+
+async function login() {
+  const email = document.getElementById('loginEmail').value.trim();
+  const senha = document.getElementById('loginSenha').value.trim();
+
+  const { data, error } = await supabaseClient.auth.signInWithPassword({
+    email: email,
+    password: senha
+  });
+
+  console.log('Login:', data);
+  console.log('Erro login:', error);
+
+  if (error) {
+    alert(error.message);
+    return;
+  }
+
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+}
+
+async function verificarSessao() {
+  const { data } = await supabaseClient.auth.getSession();
+
+  if (data.session) {
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+  } else {
+    document.getElementById('loginScreen').style.display = 'flex';
+    document.getElementById('app').style.display = 'none';
+  }
+}
+
+verificarSessao();
+
 
 // ===== STATE =====
 let state = {

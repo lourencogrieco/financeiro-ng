@@ -9,6 +9,28 @@
 </head>
 <body>
 
+<div id="loginScreen" class="login-screen">
+  <div class="login-box">
+    <h2>Entrar</h2>
+
+    <input type="email" id="loginEmail" placeholder="Seu email">
+    <input type="password" id="loginSenha" placeholder="Sua senha">
+
+    <button onclick="login()">Entrar</button>
+
+    <hr>
+
+    <h3>Criar conta</h3>
+
+    <input type="email" id="cadastroEmail" placeholder="Email">
+    <input type="password" id="cadastroSenha" placeholder="Senha">
+
+    <button onclick="cadastrarUsuario()">Criar conta</button>
+  </div>
+</div>
+
+<div id="app" style="display:none;">
+
 <!-- Sidebar -->
 <aside class="sidebar" id="sidebar">
   <div class="sidebar-logo">
@@ -742,6 +764,6 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="app.js"></script>
-
+</div>  
 </body>
 </html>
