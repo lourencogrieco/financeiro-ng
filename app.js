@@ -1711,17 +1711,21 @@ function fecharModalClienteForce() {
 }
 
 async function salvarCliente(event) {
-event.preventDefault();
+  event.preventDefault();
 
-const id = document.getElementById('editClienteId').value;
+  const id = document.getElementById('editClienteId').value;
 
-const dados = {
-nome: document.getElementById('cNome').value.trim(),
-cpf_cnpj: document.getElementById('cCpfCnpj').value.trim(),
-telefone: document.getElementById('cTelefone').value.trim(),
-email: document.getElementById('cEmail').value.trim(),
-endereco: document.getElementById('cEndereco').value.trim()
-};
+  const { data: sessao } = await supabaseClient.auth.getSession();
+  const userId = sessao.session.user.id;
+
+  const dados = {
+    nome: document.getElementById('cNome').value.trim(),
+    cpf_cnpj: document.getElementById('cCpfCnpj').value.trim(),
+    telefone: document.getElementById('cTelefone').value.trim(),
+    email: document.getElementById('cEmail').value.trim(),
+    endereco: document.getElementById('cEndereco').value.trim(),
+    user_id: userId
+  };
 
 if (id) {
 const { error } = await supabaseClient
