@@ -1976,7 +1976,7 @@ async function salvarCliente(event) {
 
   const dados = {
     nome: document.getElementById('cNome').value.trim(),
-    cpf_cnpj: document.getElementById('cCpfCnpj').value.trim(),
+    cpf_cnpj: document.getElementById('ccpf_cnpj').value.trim(),
     telefone: document.getElementById('cTelefone').value.trim(),
     email: document.getElementById('cEmail').value.trim(),
     endereco: document.getElementById('cEndereco').value.trim(),
@@ -1984,39 +1984,15 @@ async function salvarCliente(event) {
     user_id: state.meuPerfil?.userId,
   };
 
-if (id) {
-const { error } = await supabaseClient
-.from('clientes')
-.update(dados)
-.eq('id', id);
-
-
-if (error) {
-  console.error(error);
-  toast('Erro ao atualizar cliente');
-  return;
-}
-
-toast('Cliente atualizado!', 'success');
-
-
-} else {
-const { error } = await supabaseClient
-.from('clientes')
-.insert([dados]);
-console.log('Dados enviados:', dados);
-console.log('Erro insert:', error);
-
-
-if (error) {
-  console.error(error);
-  toast('Erro ao cadastrar cliente');
-  return;
-}
-
-toast('Cliente cadastrado!', 'success');
-
-}
+  if (id) {
+    const { error } = await supabaseClient.from('clientes').update(dados).eq('id', id);
+    if (error) { console.error(error); toast('Erro ao atualizar cliente', 'error'); return; }
+    toast('Cliente atualizado!', 'success');
+  } else {
+    const { error } = await supabaseClient.from('clientes').insert([dados]);
+    if (error) { console.error(error); toast('Erro ao cadastrar cliente', 'error'); return; }
+    toast('Cliente cadastrado!', 'success');
+  }
 
 const { data: clientesAtualizados } = await supabaseClient
   .from('clientes').select('*').eq('empresa_id', state.empresaId).order('created_at', { ascending: false });
@@ -2249,7 +2225,7 @@ function gerarNotaDebito(clienteId) {
         <div class="doc-section-title">Cliente</div>
         <div class="doc-client-grid">
           <div><span class="doc-label">Nome / Razão Social: </span><strong>${cliente.nome}</strong></div>
-          ${cliente.cpf_cnpj ? `<div><span class="doc-label">CPF / CNPJ: </span>${cliente.cpfCnpj}</div>` : ''}
+          ${cliente.cpf_cnpj ? `<div><span class="doc-label">CPF / CNPJ: </span>${cliente.cpf_cnpj}</div>` : ''}
           ${cliente.email ? `<div><span class="doc-label">Email: </span>${cliente.email}</div>` : ''}
           ${cliente.telefone ? `<div><span class="doc-label">Telefone: </span>${cliente.telefone}</div>` : ''}
           ${cliente.endereco ? `<div style="grid-column:1/-1"><span class="doc-label">Endereço: </span>${cliente.endereco}</div>` : ''}
@@ -2338,7 +2314,7 @@ function gerarRecibo(cobrancaId) {
         <div class="doc-section-title">Pagador</div>
         <div class="doc-client-grid">
           <div><span class="doc-label">Nome / Razão Social: </span><strong>${cliente.nome}</strong></div>
-          ${cliente.cpf_cnpj ? `<div><span class="doc-label">CPF / CNPJ: </span>${cliente.cpfCnpj}</div>` : ''}
+          ${cliente.cpf_cnpj ? `<div><span class="doc-label">CPF / CNPJ: </span>${cliente.cpf_cnpj}</div>` : ''}
           ${cliente.email ? `<div><span class="doc-label">Email: </span>${cliente.email}</div>` : ''}
           ${cliente.telefone ? `<div><span class="doc-label">Telefone: </span>${cliente.telefone}</div>` : ''}
         </div>
