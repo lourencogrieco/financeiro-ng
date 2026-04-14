@@ -64,7 +64,7 @@ async function logout() {
 // Após login: verifica se usuário já pertence a uma empresa
 async function inicializarContextoEmpresa(user) {
   const { data: membro, error } = await supabaseClient
-    .from('membros_empresa')
+    .from('usuarios_empresa')
     .select('role, nome, empresa_id, empresas(id, nome)')
     .eq('user_id', user.id)
     .maybeSingle();
@@ -426,7 +426,7 @@ async function criarEmpresa() {
   if (eEmpresa) { alert('Erro ao criar empresa: ' + eEmpresa.message); return; }
 
   const { error: eMembro } = await supabaseClient
-    .from('membros_empresa')
+    .from('usuarios_empresa')
     .insert([{ empresa_id: empresa.id, user_id: user.id, nome: nomeUsuario, role: 'admin' }]);
   if (eMembro) { alert('Erro ao criar usuário: ' + eMembro.message); return; }
 
@@ -462,7 +462,7 @@ async function entrarComCodigo() {
   if (eConvite || !convite) { alert('Código inválido ou já utilizado.'); return; }
 
   const { error: eMembro } = await supabaseClient
-    .from('membros_empresa')
+    .from('usuarios_empresa')
     .insert([{ empresa_id: convite.empresa_id, user_id: user.id, nome: nomeUsuario, role: 'operador' }]);
   if (eMembro) { alert('Erro ao entrar na empresa: ' + eMembro.message); return; }
 
@@ -530,7 +530,7 @@ async function renderEquipe() {
   if (!el || !state.empresaId) return;
 
   const { data: membros, error } = await supabaseClient
-    .from('membros_empresa')
+    .from('usuariosempresa')
     .select('*')
     .eq('empresa_id', state.empresaId)
     .order('criado_em', { ascending: true });
