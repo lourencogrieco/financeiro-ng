@@ -51,6 +51,9 @@ async function login() {
 async function verificarSessao() {
   const { data } = await supabaseClient.auth.getSession();
 
+  const usuarioAtual = data.session?.user;
+console.log(usuarioAtual);
+
   if (data.session) {
     document.getElementById('loginScreen').style.display = 'none';
     document.getElementById('app').style.display = 'block';
@@ -62,6 +65,12 @@ async function verificarSessao() {
 
 verificarSessao();
 
+async function logout() {
+  await supabaseClient.auth.signOut();
+
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('loginScreen').style.display = 'flex';
+}
 
 // ===== STATE =====
 let state = {
