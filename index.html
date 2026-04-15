@@ -29,9 +29,13 @@
         <label style="font-size:12px;font-weight:600;color:#6b7280;margin-bottom:4px;display:block">Nome da empresa</label>
         <input type="text" class="input" id="setupNomeEmpresa" placeholder="Ex: Advocacia Silva & Associados" style="background:#f9fafb">
       </div>
-      <div class="form-group" style="margin-bottom:18px">
+      <div class="form-group" style="margin-bottom:12px">
         <label style="font-size:12px;font-weight:600;color:#6b7280;margin-bottom:4px;display:block">Seu nome</label>
         <input type="text" class="input" id="setupNomeUsuarioCriar" placeholder="Seu nome completo" style="background:#f9fafb">
+      </div>
+      <div class="form-group" style="margin-bottom:18px">
+        <label style="font-size:12px;font-weight:600;color:#6b7280;margin-bottom:4px;display:block">Seu cargo</label>
+        <input type="text" class="input" id="setupCargoCriar" placeholder="Ex: Advogado, Sócio, Assistente..." style="background:#f9fafb">
       </div>
       <button class="btn btn-primary" style="width:100%;justify-content:center;height:44px;font-size:14px" onclick="criarEmpresa()">Criar empresa</button>
     </div>
@@ -41,9 +45,13 @@
         <label style="font-size:12px;font-weight:600;color:#6b7280;margin-bottom:4px;display:block">Código de convite</label>
         <input type="text" class="input" id="setupCodigo" placeholder="Ex: AB12CD34" style="background:#f9fafb;letter-spacing:2px;text-transform:uppercase;font-weight:700" maxlength="8">
       </div>
-      <div class="form-group" style="margin-bottom:18px">
+      <div class="form-group" style="margin-bottom:12px">
         <label style="font-size:12px;font-weight:600;color:#6b7280;margin-bottom:4px;display:block">Seu nome</label>
         <input type="text" class="input" id="setupNomeUsuarioEntrar" placeholder="Seu nome completo" style="background:#f9fafb">
+      </div>
+      <div class="form-group" style="margin-bottom:18px">
+        <label style="font-size:12px;font-weight:600;color:#6b7280;margin-bottom:4px;display:block">Seu cargo</label>
+        <input type="text" class="input" id="setupCargoEntrar" placeholder="Ex: Advogado, Sócio, Assistente..." style="background:#f9fafb">
       </div>
       <button class="btn btn-primary" style="width:100%;justify-content:center;height:44px;font-size:14px" onclick="entrarComCodigo()">Entrar na empresa</button>
     </div>
@@ -60,13 +68,15 @@
     <input type="password" id="loginSenha" placeholder="Sua senha">
 
     <button onclick="login()">Entrar</button>
+    <button type="button" class="btn-esqueci" onclick="esqueciSenha()">Esqueci minha senha</button>
 
     <hr>
 
     <h3>Criar conta</h3>
 
     <input type="email" id="cadastroEmail" placeholder="Email">
-    <input type="password" id="cadastroSenha" placeholder="Senha">
+    <input type="password" id="cadastroSenha" placeholder="Senha (mín. 6 caracteres)">
+    <input type="text" id="cadastroNome" placeholder="Seu nome completo">
 
     <button onclick="cadastrarUsuario()">Criar conta</button>
   </div>
@@ -76,16 +86,14 @@
 
 <!-- Sidebar -->
 <aside class="sidebar" id="sidebar">
-  <div class="usuario-logado">
-  <div class="usuario-avatar">LG</div>
-  <div>
-    <div id="usuarioLogadoNome">Usuário</div>
-    <div id="usuarioLogadoEmail">email@empresa.com</div>
-  </div>
-</div>
-  <div class="sidebar-logo">
-    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
-    <span>Financeiro NG</span>
+  <div class="sidebar-brand">
+    <div class="sidebar-logo">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="2.5"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+      <div class="sidebar-logo-text">
+        <div class="sidebar-app-name">Financeiro NG</div>
+        <div class="sidebar-empresa-name" id="sidebarEmpresaName"></div>
+      </div>
+    </div>
   </div>
   <nav class="sidebar-nav">
     <a href="#" class="nav-item active" data-view="dashboard">
@@ -112,6 +120,10 @@
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
       Relatórios
     </a>
+    <a href="#" class="nav-item" data-view="usuarios" id="navUsuarios">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      Usuários
+    </a>
     <a href="#" class="nav-item" data-view="configuracoes">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93l-1.41 1.41M4.93 4.93l1.41 1.41M19.07 19.07l-1.41-1.41M4.93 19.07l1.41-1.41M12 2v2M12 20v2M2 12h2M20 12h2"/></svg>
       Configurações
@@ -122,11 +134,11 @@
     <div class="user-avatar" id="userAvatar">?</div>
     <div class="user-info">
       <div class="user-nome" id="userNome">—</div>
-      <div class="user-empresa" id="userEmpresa">—</div>
+      <div class="user-cargo" id="userCargo" style="display:none"></div>
     </div>
     <span class="user-role" id="userRole"></span>
   </div>
-  <button class="btn btn-outline" onclick="logout()">Sair</button>
+  <button class="btn btn-outline sidebar-sair" onclick="logout()">Sair</button>
 </aside>
 
 <!-- Main -->
@@ -546,6 +558,31 @@
     </div>
   </div>
 
+  <!-- Usuários -->
+  <div class="view" id="view-usuarios">
+    <section class="section" style="max-width:700px">
+      <div class="section-header">
+        <h2>Membros da Equipe</h2>
+        <button class="btn btn-primary" onclick="abrirConviteUsuarios()" id="btnConvidarUsuario" style="display:none">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Convidar Usuário
+        </button>
+      </div>
+      <div id="listaUsuarios"></div>
+    </section>
+
+    <section class="section" style="max-width:700px;margin-top:20px" id="secaoConviteUsuarios" style="display:none">
+      <div class="section-header"><h2>Gerar Convite</h2></div>
+      <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px">O convidado deve criar uma conta e usar o código abaixo para entrar na empresa.</p>
+      <div class="form-group" style="margin-bottom:12px">
+        <label style="font-size:12px;font-weight:600;color:var(--text-muted)">Email do convidado (opcional)</label>
+        <input type="email" class="input" id="conviteEmailUsuario" placeholder="email@exemplo.com" style="max-width:360px">
+      </div>
+      <button class="btn btn-primary" onclick="gerarConviteUsuarios()">Gerar código de convite</button>
+      <div id="conviteGeradoUsuarios" style="display:none;margin-top:16px"></div>
+    </section>
+  </div>
+
 </main>
 
 <!-- Modal Contas a Pagar -->
@@ -658,9 +695,26 @@
         <label>Endereço</label>
         <input type="text" class="input" id="cEndereco" maxlength="200" placeholder="Rua, número, bairro, cidade">
       </div>
+      <div class="form-group" style="margin-bottom:14px">
+        <label>Contrato (PDF ou imagem)</label>
+        <div class="contract-upload-area" id="contractUploadArea">
+          <input type="file" id="cContrato" accept=".pdf,.jpg,.jpeg,.png" style="display:none" onchange="previewContrato(event)">
+          <div id="contractPreview" class="contract-preview-empty" onclick="document.getElementById('cContrato').click()">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            <span>Clique para anexar contrato</span>
+          </div>
+          <div id="contratoAtual" style="display:none">
+            <a id="contratoLink" href="#" target="_blank" class="btn btn-outline" style="font-size:12px">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+              Ver contrato atual
+            </a>
+            <button type="button" class="btn btn-outline" style="font-size:12px" onclick="document.getElementById('cContrato').click()">Substituir</button>
+          </div>
+        </div>
+      </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-outline" onclick="fecharModalClienteForce()">Cancelar</button>
-        <button type="submit" class="btn btn-primary">Salvar</button>
+        <button type="submit" class="btn btn-primary" id="btnSalvarCliente">Salvar</button>
       </div>
     </form>
   </div>
@@ -679,10 +733,9 @@
       <input type="hidden" id="editDespesaId">
       <div class="form-row">
         <div class="form-group flex2">
-          <label>Cliente *</label>
-          <select class="input" id="dCliente" required>
-            <option value="">Selecione um cliente</option>
-          </select>
+          <label>Cliente</label>
+          <input type="text" class="input" id="dCliente" list="clientesDespesaList" maxlength="120" placeholder="Digite ou selecione um cliente">
+          <datalist id="clientesDespesaList"></datalist>
         </div>
       </div>
       <div class="form-row">

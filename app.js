@@ -10,21 +10,33 @@ console.log("Cliente Supabase:", supabaseClient);
 async function cadastrarUsuario() {
   const email = document.getElementById('cadastroEmail').value.trim();
   const senha = document.getElementById('cadastroSenha').value.trim();
+  const nome = document.getElementById('cadastroNome')?.value.trim() || '';
 
-  const { data, error } = await supabaseClient.auth.signUp({
-    email: email,
-    password: senha
+  if (!email || !senha) { alert('Preencha email e senha.'); return; }
+  if (senha.length < 6) { alert('A senha deve ter no mínimo 6 caracteres.'); return; }
+
+  const { error } = await supabaseClient.auth.signUp({
+    email,
+    password: senha,
+    options: { data: { nome } }
   });
 
-  console.log('Cadastro:', data);
-  console.log('Erro:', error);
+  if (error) { alert(error.message); return; }
+  alert('Conta criada com sucesso! Verifique seu email para confirmar antes de fazer login.');
+}
 
-  if (error) {
-    alert(error.message);
+async function esqueciSenha() {
+  const email = document.getElementById('loginEmail').value.trim();
+  if (!email) {
+    alert('Digite seu email no campo acima para receber o link de redefinição de senha.');
+    document.getElementById('loginEmail').focus();
     return;
   }
-
-  alert('Usuário criado com sucesso. Verifique seu email.');
+  const { error } = await supabaseClient.auth.resetPasswordForEmail(email, {
+    redirectTo: window.location.origin
+  });
+  if (error) { alert('Erro: ' + error.message); return; }
+  alert('Email de redefinição de senha enviado! Verifique sua caixa de entrada (e o spam).');
 }
 
 async function login() {
@@ -85,6 +97,7 @@ async function inicializarContextoEmpresa(user) {
     email: user.email,
     nome: membro.nome || user.email,
     perfil: membro.perfil,
+    cargo: membro.cargo || '',
   };
 
   document.getElementById('setupEmpresaScreen').style.display = 'none';
@@ -318,6 +331,7 @@ function despesaParaDb(d) {
     empresa_id: state.empresaId,
     user_id: state.meuPerfil?.userId,
     cliente_id: d.clienteId || null,
+    cliente_nome: d.clienteNome || null,
     descricao: d.descricao, data: d.data, valor: d.valor,
     observacoes: d.observacoes || null, status: d.status,
     criado_em: d.criadoEm || new Date().toISOString(),
@@ -325,7 +339,8 @@ function despesaParaDb(d) {
 }
 function dbParaDespesa(row) {
   return {
-    id: row.id, clienteId: row.cliente_id, descricao: row.descricao,
+    id: row.id, clienteId: row.cliente_id, clienteNome: row.cliente_nome || null,
+    descricao: row.descricao,
     data: row.data, valor: Number(row.valor), observacoes: row.observacoes,
     status: row.status, criadoEm: row.criado_em,
   };
@@ -413,7 +428,8 @@ function setupAba(aba) {
 async function criarEmpresa() {
   const nome = document.getElementById('setupNomeEmpresa').value.trim();
   const nomeUsuario = document.getElementById('setupNomeUsuarioCriar').value.trim();
-  if (!nome || !nomeUsuario) { alert('Preencha todos os campos.'); return; }
+  const cargo = document.getElementById('setupCargoCriar').value.trim();
+  if (!nome || !nomeUsuario) { alert('Preencha nome da empresa e seu nome.'); return; }
 
   const { data: sessao } = await supabaseClient.auth.getSession();
   const user = sessao.session.user;
@@ -427,12 +443,12 @@ async function criarEmpresa() {
 
   const { error: eMembro } = await supabaseClient
     .from('usuarios_empresa')
-    .insert([{ empresa_id: empresa.id, user_id: user.id, nome: nomeUsuario, perfil: 'admin' }]);
+    .insert([{ empresa_id: empresa.id, user_id: user.id, nome: nomeUsuario, perfil: 'admin', cargo }]);
   if (eMembro) { alert('Erro ao criar usuário: ' + eMembro.message); return; }
 
   state.empresaId = empresa.id;
   state.empresaNome = empresa.nome;
-  state.meuPerfil = { userId: user.id, email: user.email, nome: nomeUsuario, perfil: 'admin' };
+  state.meuPerfil = { userId: user.id, email: user.email, nome: nomeUsuario, perfil: 'admin', cargo };
 
   document.getElementById('setupEmpresaScreen').style.display = 'none';
   document.getElementById('app').style.display = 'block';
@@ -447,6 +463,7 @@ async function criarEmpresa() {
 async function entrarComCodigo() {
   const codigo = document.getElementById('setupCodigo').value.trim().toUpperCase();
   const nomeUsuario = document.getElementById('setupNomeUsuarioEntrar').value.trim();
+  const cargo = document.getElementById('setupCargoEntrar').value.trim();
   if (!codigo || !nomeUsuario) { alert('Preencha todos os campos.'); return; }
 
   const { data: sessao } = await supabaseClient.auth.getSession();
@@ -463,7 +480,7 @@ async function entrarComCodigo() {
 
   const { error: eMembro } = await supabaseClient
     .from('usuarios_empresa')
-    .insert([{ empresa_id: convite.empresa_id, user_id: user.id, nome: nomeUsuario, perfil: 'operador' }]);
+    .insert([{ empresa_id: convite.empresa_id, user_id: user.id, nome: nomeUsuario, perfil: 'operador', cargo }]);
   if (eMembro) { alert('Erro ao entrar na empresa: ' + eMembro.message); return; }
 
   await supabaseClient
@@ -476,7 +493,7 @@ async function entrarComCodigo() {
 
   state.empresaId = convite.empresa_id;
   state.empresaNome = empresa?.nome || '';
-  state.meuPerfil = { userId: user.id, email: user.email, nome: nomeUsuario, perfil: 'operador' };
+  state.meuPerfil = { userId: user.id, email: user.email, nome: nomeUsuario, perfil: 'operador', cargo };
 
   document.getElementById('setupEmpresaScreen').style.display = 'none';
   document.getElementById('app').style.display = 'block';
@@ -490,15 +507,20 @@ async function entrarComCodigo() {
 
 function renderSidebarUser() {
   if (!state.meuPerfil) return;
-  const { nome, perfil } = state.meuPerfil;
+  const { nome, perfil, cargo } = state.meuPerfil;
   const iniciais = nome.split(' ').filter(Boolean).map(w => w[0]).join('').slice(0, 2).toUpperCase();
   const el = document.getElementById('sidebarUser');
   if (!el) return;
   el.style.display = 'flex';
   document.getElementById('userAvatar').textContent = iniciais;
   document.getElementById('userNome').textContent = nome;
-  document.getElementById('userEmpresa').textContent = state.empresaNome || '';
+  const cargoEl = document.getElementById('userCargo');
+  if (cargoEl) { cargoEl.textContent = cargo || ''; cargoEl.style.display = cargo ? '' : 'none'; }
   document.getElementById('userRole').textContent = perfil === 'admin' ? 'Admin' : 'Operador';
+
+  // Empresa name in sidebar header
+  const empresaEl = document.getElementById('sidebarEmpresaName');
+  if (empresaEl) empresaEl.textContent = state.empresaNome || '';
 }
 
 async function gerarConvite() {
@@ -583,7 +605,7 @@ function navegarPara(view) {
   document.getElementById('view-' + view)?.classList.add('active');
   document.querySelector(`[data-view="${view}"]`)?.classList.add('active');
 
-  const titulos = { dashboard: 'Dashboard', cobrancas: 'Cobranças', relatorios: 'Relatórios', configuracoes: 'Configurações', clientes: 'Clientes', despesas: 'Despesas', contaspagar: 'Contas a Pagar' };
+  const titulos = { dashboard: 'Dashboard', cobrancas: 'Cobranças', relatorios: 'Relatórios', configuracoes: 'Configurações', clientes: 'Clientes', despesas: 'Despesas', contaspagar: 'Contas a Pagar', usuarios: 'Usuários' };
   document.getElementById('pageTitle').textContent = titulos[view] || '';
   atualizarAcaoTopo(view);
 
@@ -594,6 +616,7 @@ function navegarPara(view) {
   else if (view === 'clientes') renderClientes();
   else if (view === 'despesas') renderDespesas();
   else if (view === 'contaspagar') renderContasPagar();
+  else if (view === 'usuarios') renderUsuarios();
 }
 
 function atualizarAcaoTopo(view) {
@@ -622,6 +645,7 @@ function atualizarAcaoTopo(view) {
     clientes: [
       { label: 'Novo Cliente', action: "abrirModalCliente()" },
     ],
+    usuarios: [],
     configuracoes: [],
   };
 
@@ -1872,10 +1896,11 @@ function popularClientesForms() {
   const selF = document.getElementById('fCliente');
   if (selF) { const v = selF.value; selF.innerHTML = opts; selF.value = v; }
 
-  const optsD = '<option value="">Selecione um cliente</option>' +
-    state.clientes.map(c => `<option value="${c.id}">${c.nome}</option>`).join('');
-  const selD = document.getElementById('dCliente');
-  if (selD) { const v = selD.value; selD.innerHTML = optsD; selD.value = v; }
+  // Despesa: datalist para digitação livre
+  const datalistD = document.getElementById('clientesDespesaList');
+  if (datalistD) {
+    datalistD.innerHTML = state.clientes.map(c => `<option value="${c.nome}"></option>`).join('');
+  }
 
   const optsFiltro = '<option value="">Todos os clientes</option>' +
     state.clientes.map(c => `<option value="${c.id}">${c.nome}</option>`).join('');
@@ -1927,6 +1952,9 @@ function renderClientes() {
             <button class="btn-icon" title="Nota de Débito" onclick="gerarNotaDebito('${c.id}')">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
             </button>
+            ${c.contract_url ? `<a class="btn-icon" title="Ver Contrato" href="${c.contract_url}" target="_blank" style="text-decoration:none;display:inline-flex;align-items:center;justify-content:center">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/></svg>
+            </a>` : ''}
             <button class="btn-icon" title="Nova Despesa" onclick="abrirModalDespesa(null,'${c.id}')">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
             </button>
@@ -1947,6 +1975,10 @@ function abrirModalCliente(id) {
   document.getElementById('formCliente').reset();
   document.getElementById('editClienteId').value = '';
   document.getElementById('modalClienteTitulo').textContent = 'Novo Cliente';
+  // Reset contract area
+  limparContrato();
+  const contratoAtualDiv = document.getElementById('contratoAtual');
+  if (contratoAtualDiv) contratoAtualDiv.style.display = 'none';
   if (id) {
     const c = state.clientes.find(x => x.id === id);
     if (!c) return;
@@ -1957,6 +1989,15 @@ function abrirModalCliente(id) {
     document.getElementById('cTelefone').value = c.telefone || '';
     document.getElementById('cEmail').value = c.email || '';
     document.getElementById('cEndereco').value = c.endereco || '';
+    if (c.contract_url) {
+      const preview = document.getElementById('contractPreview');
+      if (preview) { preview.style.display = 'none'; }
+      if (contratoAtualDiv) {
+        contratoAtualDiv.style.display = 'flex';
+        const link = document.getElementById('contratoLink');
+        if (link) link.href = c.contract_url;
+      }
+    }
   }
   document.getElementById('modalClienteOverlay').classList.add('open');
 }
@@ -1973,6 +2014,8 @@ async function salvarCliente(event) {
   event.preventDefault();
 
   const id = document.getElementById('editClienteId').value;
+  const btnSalvar = document.getElementById('btnSalvarCliente');
+  if (btnSalvar) { btnSalvar.disabled = true; btnSalvar.textContent = 'Salvando...'; }
 
   const dados = {
     nome: document.getElementById('cNome').value.trim(),
@@ -1984,12 +2027,32 @@ async function salvarCliente(event) {
     user_id: state.meuPerfil?.userId,
   };
 
+  // Upload de contrato se selecionado
+  const fileInput = document.getElementById('cContrato');
+  if (fileInput?.files?.length) {
+    const file = fileInput.files[0];
+    const clienteIdUpload = id || uid();
+    const filePath = `${state.empresaId}/${clienteIdUpload}/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+    const { data: uploadData, error: uploadError } = await supabaseClient.storage
+      .from('contratos')
+      .upload(filePath, file, { upsert: true });
+    if (uploadError) {
+      console.error('Erro upload contrato:', uploadError);
+      toast('Erro ao enviar contrato: ' + uploadError.message, 'error');
+    } else {
+      const { data: urlData } = supabaseClient.storage.from('contratos').getPublicUrl(uploadData.path);
+      dados.contract_url = urlData.publicUrl;
+    }
+  }
+
   if (id) {
     const { error } = await supabaseClient.from('clientes').update(dados).eq('id', id);
+    if (btnSalvar) { btnSalvar.disabled = false; btnSalvar.textContent = 'Salvar'; }
     if (error) { console.error(error); toast('Erro ao atualizar cliente', 'error'); return; }
     toast('Cliente atualizado!', 'success');
   } else {
     const { error } = await supabaseClient.from('clientes').insert([dados]);
+    if (btnSalvar) { btnSalvar.disabled = false; btnSalvar.textContent = 'Salvar'; }
     if (error) { console.error(error); toast('Erro ao cadastrar cliente', 'error'); return; }
     toast('Cliente cadastrado!', 'success');
   }
@@ -2059,9 +2122,13 @@ function renderDespesas() {
     empty.style.display = 'flex';
   } else {
     empty.style.display = 'none';
-    tbody.innerHTML = lista.map(d => `
+    tbody.innerHTML = lista.map(d => {
+      const clienteDisplay = d.clienteId
+        ? nomeCliente(d.clienteId)
+        : (d.clienteNome ? `<span style="font-weight:600">${d.clienteNome}</span>` : '<span style="color:var(--text-light)">—</span>');
+      return `
       <tr>
-        <td style="font-weight:600">${nomeCliente(d.clienteId)}</td>
+        <td style="font-weight:600">${clienteDisplay}</td>
         <td>
           <div>${d.descricao}</div>
           ${d.observacoes ? `<div style="font-size:11px;color:var(--text-muted)">${d.observacoes}</div>` : ''}
@@ -2071,9 +2138,13 @@ function renderDespesas() {
         <td><span class="badge ${d.status === 'pendente' ? 'badge-pendente' : 'badge-pago'}">${d.status === 'faturado' ? 'Faturado' : 'Pendente'}</span></td>
         <td>
           <div class="actions">
-            ${d.status === 'pendente' ? `<button class="btn-icon success" title="Marcar como faturado" onclick="marcarDespesaFaturada('${d.id}')">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-            </button>` : ''}
+            ${d.status === 'pendente'
+              ? `<button class="btn-icon success" title="Marcar como faturado" onclick="marcarDespesaFaturada('${d.id}')">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                 </button>`
+              : `<button class="btn-icon success" title="Gerar Recibo" onclick="gerarReciboDespesa('${d.id}')">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+                 </button>`}
             <button class="btn-icon" title="Editar" onclick="abrirModalDespesa('${d.id}')">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
             </button>
@@ -2082,8 +2153,8 @@ function renderDespesas() {
             </button>
           </div>
         </td>
-      </tr>
-    `).join('');
+      </tr>`;
+    }).join('');
   }
 }
 
@@ -2091,17 +2162,20 @@ function abrirModalDespesa(id, preClienteId) {
   document.getElementById('formDespesa').reset();
   document.getElementById('editDespesaId').value = '';
   document.getElementById('modalDespesaTitulo').textContent = 'Nova Despesa';
-  const selD = document.getElementById('dCliente');
-  selD.innerHTML = '<option value="">Selecione um cliente</option>' +
-    state.clientes.map(c => `<option value="${c.id}">${c.nome}</option>`).join('');
   document.getElementById('dData').value = hoje();
-  if (preClienteId) selD.value = preClienteId;
+  // Pre-select client by ID
+  if (preClienteId) {
+    const c = state.clientes.find(x => x.id === preClienteId);
+    if (c) document.getElementById('dCliente').value = c.nome;
+  }
   if (id) {
     const d = state.despesas.find(x => x.id === id);
     if (!d) return;
     document.getElementById('editDespesaId').value = d.id;
     document.getElementById('modalDespesaTitulo').textContent = 'Editar Despesa';
-    selD.value = d.clienteId;
+    // Resolve client name from ID or stored name
+    const clienteNomeDisplay = d.clienteId ? (nomeClienteTexto(d.clienteId) || d.clienteNome || '') : (d.clienteNome || '');
+    document.getElementById('dCliente').value = clienteNomeDisplay;
     document.getElementById('dDescricao').value = d.descricao;
     document.getElementById('dData').value = d.data;
     document.getElementById('dValor').value = fmtNumeroBR(d.valor);
@@ -2121,8 +2195,11 @@ function fecharModalDespesaForce() {
 function salvarDespesa(event) {
   event.preventDefault();
   const id = document.getElementById('editDespesaId').value;
+  const clienteTexto = document.getElementById('dCliente').value.trim();
+  const clienteExistente = state.clientes.find(c => c.nome.toLowerCase() === clienteTexto.toLowerCase());
   const dados = {
-    clienteId: document.getElementById('dCliente').value,
+    clienteId: clienteExistente ? clienteExistente.id : null,
+    clienteNome: clienteTexto || null,
     descricao: document.getElementById('dDescricao').value.trim(),
     data: document.getElementById('dData').value,
     valor: parseMoedaBR(document.getElementById('dValor').value),
@@ -2342,8 +2419,205 @@ function gerarRecibo(cobrancaId) {
   document.getElementById('printOverlay').classList.add('open');
 }
 
+// ===== RECIBO DE DESPESA =====
+function gerarReciboDespesa(despesaId) {
+  const d = state.despesas.find(x => x.id === despesaId);
+  if (!d || d.status !== 'faturado') return;
+
+  state.contadores.recibo = (state.contadores.recibo || 0) + 1;
+  salvarConfigSupabase();
+  const numero = String(state.contadores.recibo).padStart(4, '0');
+  const cliente = d.clienteId ? state.clientes.find(x => x.id === d.clienteId) : null;
+  const clienteNomeDisplay = cliente ? cliente.nome : (d.clienteNome || '');
+
+  document.getElementById('printDoc').innerHTML = `
+    <div class="doc-paper">
+      <div class="doc-header">
+        <div class="doc-logo">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="2.5"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+          <div>
+            <div class="doc-office">${state.empresaNome || 'Financeiro NG'}</div>
+            <div class="doc-office-sub">Recibo de Despesa</div>
+          </div>
+        </div>
+        <div class="doc-title-block">
+          <div class="doc-title">RECIBO DE DESPESA</div>
+          <div class="doc-meta">Nº ${numero}</div>
+          <div class="doc-meta">Data: ${fmtData(d.data)}</div>
+        </div>
+      </div>
+
+      <div class="doc-recibo-valor">
+        <div class="doc-recibo-valor-label">Valor da Despesa</div>
+        <div class="doc-recibo-valor-num">${fmt(d.valor)}</div>
+      </div>
+
+      ${clienteNomeDisplay ? `
+      <div class="doc-section">
+        <div class="doc-section-title">Cliente</div>
+        <div class="doc-client-grid">
+          <div><span class="doc-label">Nome / Razão Social: </span><strong>${clienteNomeDisplay}</strong></div>
+          ${cliente?.cpf_cnpj ? `<div><span class="doc-label">CPF / CNPJ: </span>${cliente.cpf_cnpj}</div>` : ''}
+          ${cliente?.email ? `<div><span class="doc-label">Email: </span>${cliente.email}</div>` : ''}
+          ${cliente?.telefone ? `<div><span class="doc-label">Telefone: </span>${cliente.telefone}</div>` : ''}
+        </div>
+      </div>` : ''}
+
+      <div class="doc-section">
+        <div class="doc-section-title">Referente a</div>
+        <div class="doc-client-grid">
+          <div><span class="doc-label">Descrição: </span><strong>${d.descricao}</strong></div>
+          <div><span class="doc-label">Data: </span>${fmtData(d.data)}</div>
+          ${d.observacoes ? `<div style="grid-column:1/-1"><span class="doc-label">Obs: </span>${d.observacoes}</div>` : ''}
+        </div>
+      </div>
+
+      <div class="doc-footer">
+        <div class="doc-sign-block"><div class="doc-sign-line"></div><div class="doc-sign-label">Assinatura do Emitente</div></div>
+        <div class="doc-sign-block"><div class="doc-sign-line"></div><div class="doc-sign-label">Assinatura do Cliente</div></div>
+      </div>
+      <div class="doc-obs">Recibo emitido em ${fmtData(hoje())}. Este documento confirma a despesa acima discriminada.</div>
+    </div>
+  `;
+  document.getElementById('printOverlay').classList.add('open');
+}
+
 function fecharPrintOverlay() {
   document.getElementById('printOverlay').classList.remove('open');
+}
+
+// ===== USUÁRIOS =====
+async function renderUsuarios() {
+  const el = document.getElementById('listaUsuarios');
+  const btnConvidar = document.getElementById('btnConvidarUsuario');
+  if (!el || !state.empresaId) return;
+
+  const isAdmin = state.meuPerfil?.perfil === 'admin';
+  if (btnConvidar) btnConvidar.style.display = isAdmin ? 'flex' : 'none';
+
+  const { data: membros, error } = await supabaseClient
+    .from('usuarios_empresa')
+    .select('*')
+    .eq('empresa_id', state.empresaId)
+    .order('criado_em', { ascending: true });
+
+  if (error || !membros?.length) {
+    el.innerHTML = '<div class="empty-state" style="padding:20px 0"><p>Nenhum membro encontrado.</p></div>';
+    return;
+  }
+
+  el.innerHTML = membros.map(m => {
+    const ini = (m.nome || '?').split(' ').filter(Boolean).map(w => w[0]).join('').slice(0, 2).toUpperCase();
+    const isMe = m.user_id === state.meuPerfil?.userId;
+    return `
+      <div class="team-member-item">
+        <div class="team-avatar">${ini}</div>
+        <div class="team-info">
+          <div class="team-nome">${m.nome}${isMe ? ' <span style="font-size:11px;color:var(--text-muted)">(você)</span>' : ''}</div>
+          <div class="team-desde">${m.cargo ? `${m.cargo} · ` : ''}Membro desde ${fmtData(m.criado_em?.slice(0, 10))}</div>
+        </div>
+        <span class="badge ${m.perfil === 'admin' ? 'badge-pago' : 'badge-pendente'}">${m.perfil === 'admin' ? 'Admin' : 'Operador'}</span>
+        ${isAdmin && !isMe ? `
+        <div class="actions" style="margin-left:8px">
+          <button class="btn-icon" title="${m.perfil === 'admin' ? 'Rebaixar para Operador' : 'Promover a Admin'}" onclick="alterarPerfilMembro('${m.user_id}','${m.perfil === 'admin' ? 'operador' : 'admin'}','${m.nome}')">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+          </button>
+          <button class="btn-icon danger" title="Remover da equipe" onclick="removerMembro('${m.user_id}','${m.nome}')">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+          </button>
+        </div>` : ''}
+      </div>`;
+  }).join('');
+}
+
+async function alterarPerfilMembro(userId, novoPerfil, nome) {
+  if (state.meuPerfil?.perfil !== 'admin') return;
+  const acao = novoPerfil === 'admin' ? 'promover' : 'rebaixar';
+  if (!confirm(`${acao.charAt(0).toUpperCase() + acao.slice(1)} "${nome}"?`)) return;
+  const { error } = await supabaseClient
+    .from('usuarios_empresa')
+    .update({ perfil: novoPerfil })
+    .eq('user_id', userId)
+    .eq('empresa_id', state.empresaId);
+  if (error) { toast('Erro ao alterar perfil', 'error'); return; }
+  toast('Perfil atualizado!', 'success');
+  renderUsuarios();
+}
+
+async function removerMembro(userId, nome) {
+  if (state.meuPerfil?.perfil !== 'admin') return;
+  if (!confirm(`Remover "${nome}" da equipe? O usuário perderá o acesso à empresa.`)) return;
+  const { error } = await supabaseClient
+    .from('usuarios_empresa')
+    .delete()
+    .eq('user_id', userId)
+    .eq('empresa_id', state.empresaId);
+  if (error) { toast('Erro ao remover membro', 'error'); return; }
+  toast('Membro removido');
+  renderUsuarios();
+}
+
+function abrirConviteUsuarios() {
+  const sec = document.getElementById('secaoConviteUsuarios');
+  if (sec) sec.style.display = sec.style.display === 'none' ? '' : 'none';
+}
+
+async function gerarConviteUsuarios() {
+  if (state.meuPerfil?.perfil !== 'admin') {
+    toast('Apenas administradores podem gerar convites.', 'error');
+    return;
+  }
+  const { data: sessao } = await supabaseClient.auth.getSession();
+  const { data: convite, error } = await supabaseClient
+    .from('convites_empresa')
+    .insert([{ empresa_id: state.empresaId, criado_por: sessao.session.user.id }])
+    .select()
+    .single();
+  if (error) { toast('Erro ao gerar convite.', 'error'); return; }
+
+  const emailConvidado = document.getElementById('conviteEmailUsuario')?.value.trim() || '';
+  const mailtoLink = emailConvidado
+    ? `mailto:${emailConvidado}?subject=Convite%20Financeiro%20NG&body=Voc%C3%AA%20foi%20convidado%20para%20a%20empresa%20${encodeURIComponent(state.empresaNome || 'Financeiro NG')}%20no%20Financeiro%20NG.%0A%0ACrie%20uma%20conta%20em%20${encodeURIComponent(window.location.origin)}%20e%20use%20o%20c%C3%B3digo%3A%20${convite.codigo}`
+    : '';
+
+  const box = document.getElementById('conviteGeradoUsuarios');
+  box.style.display = '';
+  box.innerHTML = `
+    <div class="invite-code-box">
+      <div style="flex:1">
+        <div class="invite-code">${convite.codigo}</div>
+        <div class="invite-instructions">Compartilhe este código. Ele só pode ser usado uma vez.</div>
+        ${emailConvidado ? `<div style="margin-top:6px;font-size:12px;color:var(--text-muted)">Para: <strong>${emailConvidado}</strong></div>` : ''}
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <button class="btn btn-outline" onclick="navigator.clipboard.writeText('${convite.codigo}').then(()=>toast('Código copiado!','success'))">Copiar</button>
+        ${mailtoLink ? `<a class="btn btn-outline" style="text-decoration:none;font-size:12px;display:flex;align-items:center;justify-content:center" href="${mailtoLink}">Email</a>` : ''}
+      </div>
+    </div>`;
+}
+
+// Contrato do cliente
+function previewContrato(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const preview = document.getElementById('contractPreview');
+  if (preview) {
+    preview.innerHTML = `
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      <span style="font-size:12px;color:var(--text)">${file.name}</span>
+      <button type="button" style="background:none;border:none;cursor:pointer;color:var(--danger);padding:0;margin-left:4px" onclick="limparContrato()">✕</button>`;
+  }
+}
+
+function limparContrato() {
+  document.getElementById('cContrato').value = '';
+  const preview = document.getElementById('contractPreview');
+  if (preview) {
+    preview.className = 'contract-preview-empty';
+    preview.innerHTML = `
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      <span>Clique para anexar contrato</span>`;
+  }
 }
 
 // ===== INIT =====
