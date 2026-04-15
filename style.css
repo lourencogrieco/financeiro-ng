@@ -1198,8 +1198,9 @@ form { padding: 20px 24px 0; }
 }
 
 /* ===== Badge extras (perfis) ===== */
-.badge-parcial { background: #eff6ff; color: #1e40af; }
-.badge-info    { background: #eff6ff; color: #1e40af; }
+.badge-parcial    { background: #eff6ff; color: #1e40af; }
+.badge-info       { background: #eff6ff; color: #1e40af; }
+.badge-financeiro { background: #ecfdf5; color: #065f46; }
 
 /* ===== Perfil select em usuários ===== */
 .perfil-select {

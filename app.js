@@ -108,7 +108,7 @@ async function inicializarContextoEmpresa(user) {
   atualizarStatusAutoCP();
   popularClientesForms();
   await carregarNotificacoes();
-  navegarPara(isColaborador() ? 'cobrancas' : 'dashboard');
+  navegarPara(isColaborador() ? 'cobrancas' : isFinanceiro() ? 'notasfiscais' : 'dashboard');
 }
 
 // ===== STATE =====
@@ -146,6 +146,7 @@ let state = {
   clientes: [],
   despesas: [],
   contasPagar: [],
+  notasFiscais: [],
   contadores: { notaDebito: 0, recibo: 0 },
   config: { diasAlerta: 7 },
   notificacoes: [],
@@ -215,19 +216,25 @@ const PERFIS = {
   operador:    { label: 'Operador',      cor: 'badge-pendente' },
   colaborador: { label: 'Colaborador',   cor: 'badge-parcial' },
   controler:   { label: 'Controler',     cor: 'badge-vencido' },
+  financeiro:  { label: 'Financeiro',    cor: 'badge-financeiro' },
 };
 
 function perfilAtual() { return state.meuPerfil?.perfil || ''; }
 function isAdm()         { const p = perfilAtual(); return p === 'admin' || p === 'adm'; }
 function isColaborador() { return perfilAtual() === 'colaborador'; }
 function isControler()   { return perfilAtual() === 'controler'; }
+function isFinanceiro()  { return perfilAtual() === 'financeiro'; }
 
 function podeAcessarView(view) {
   if (isAdm()) return true;
+  // apenas admin/financeiro/controler acessam notas fiscais
+  if (view === 'notasfiscais') return isFinanceiro() || isControler();
   // colaborador e operador e controler não acessam áreas administrativas
   if (['usuarios', 'configuracoes'].includes(view)) return false;
   // colaborador não acessa dashboard nem relatórios
   if (isColaborador() && ['dashboard', 'relatorios'].includes(view)) return false;
+  // financeiro só acessa notas fiscais (já tratado acima)
+  if (isFinanceiro()) return view === 'notasfiscais';
   return true;
 }
 
@@ -425,16 +432,47 @@ function dbParaContaPagar(row) {
   };
 }
 
+// --- Mappers: Notas Fiscais ---
+function notaFiscalParaDb(nf) {
+  return {
+    id: nf.id,
+    empresa_id: state.empresaId,
+    user_id: state.meuPerfil?.userId,
+    cliente_id: nf.clienteId || null,
+    cliente_nome: nf.clienteNome || null,
+    data_nota: nf.dataNota,
+    valor: nf.valor,
+    descricao: nf.descricao || null,
+    arquivo_url: nf.arquivoUrl || null,
+    observacoes: nf.observacoes || null,
+    criado_em: nf.criadoEm || new Date().toISOString(),
+  };
+}
+function dbParaNotaFiscal(row) {
+  return {
+    id: row.id,
+    clienteId: row.cliente_id || null,
+    clienteNome: row.cliente_nome || null,
+    dataNota: row.data_nota,
+    valor: Number(row.valor),
+    descricao: row.descricao || null,
+    arquivoUrl: row.arquivo_url || null,
+    observacoes: row.observacoes || null,
+    criadoEm: row.criado_em,
+  };
+}
+
 // Carrega todos os dados da empresa do Supabase
 async function carregarDadosSupabase() {
   if (!state.empresaId) return;
 
-  const [resCobrancas, resDespesas, resCP, resClientes, resConfig] = await Promise.all([
+  const [resCobrancas, resDespesas, resCP, resClientes, resConfig, resNF] = await Promise.all([
     supabaseClient.from('cobrancas').select('*').eq('empresa_id', state.empresaId).order('data_vencimento', { ascending: true }),
     supabaseClient.from('despesas').select('*').eq('empresa_id', state.empresaId).order('data', { ascending: false }),
     supabaseClient.from('contas_pagar').select('*').eq('empresa_id', state.empresaId).order('data_vencimento', { ascending: true }),
     supabaseClient.from('clientes').select('*').eq('empresa_id', state.empresaId).order('created_at', { ascending: false }),
     supabaseClient.from('user_config').select('*').eq('empresa_id', state.empresaId).maybeSingle(),
+    supabaseClient.from('notas_fiscais').select('*').eq('empresa_id', state.empresaId).order('data_nota', { ascending: false }),
   ]);
 
   if (resCobrancas.error) console.error('Erro ao carregar cobranças:', resCobrancas.error);
@@ -448,6 +486,9 @@ async function carregarDadosSupabase() {
 
   if (resClientes.error) console.error('Erro ao carregar clientes:', resClientes.error);
   else state.clientes = resClientes.data || [];
+
+  if (resNF.error) console.error('Erro ao carregar notas fiscais:', resNF.error);
+  else state.notasFiscais = (resNF.data || []).map(dbParaNotaFiscal);
 
   if (resConfig.data) {
     state.categorias = resConfig.data.categorias || state.categorias;
@@ -516,7 +557,7 @@ async function criarEmpresa() {
   atualizarStatusAutoCP();
   popularClientesForms();
   await carregarNotificacoes();
-  navegarPara('dashboard');
+  navegarPara(isFinanceiro() ? 'notasfiscais' : 'dashboard');
 }
 
 async function entrarComCodigo() {
@@ -562,7 +603,7 @@ async function entrarComCodigo() {
   atualizarStatusAutoCP();
   popularClientesForms();
   await carregarNotificacoes();
-  navegarPara(isColaborador() ? 'cobrancas' : 'dashboard');
+  navegarPara(isColaborador() ? 'cobrancas' : isFinanceiro() ? 'notasfiscais' : 'dashboard');
 }
 
 function renderSidebarUser() {
@@ -676,7 +717,7 @@ function navegarPara(view) {
   document.getElementById('view-' + view)?.classList.add('active');
   document.querySelector(`[data-view="${view}"]`)?.classList.add('active');
 
-  const titulos = { dashboard: 'Dashboard', cobrancas: 'Cobranças', relatorios: 'Relatórios', configuracoes: 'Configurações', clientes: 'Clientes', despesas: 'Despesas Reembolsáveis', contaspagar: 'Contas a Pagar', usuarios: 'Usuários' };
+  const titulos = { dashboard: 'Dashboard', cobrancas: 'Cobranças', relatorios: 'Relatórios', configuracoes: 'Configurações', clientes: 'Clientes', despesas: 'Despesas Reembolsáveis', contaspagar: 'Contas a Pagar', usuarios: 'Usuários', notasfiscais: 'Notas Fiscais' };
   document.getElementById('pageTitle').textContent = titulos[view] || '';
   atualizarAcaoTopo(view);
 
@@ -688,6 +729,7 @@ function navegarPara(view) {
   else if (view === 'despesas') renderDespesas();
   else if (view === 'contaspagar') renderContasPagar();
   else if (view === 'usuarios') renderUsuarios();
+  else if (view === 'notasfiscais') renderNotasFiscais();
 }
 
 function atualizarAcaoTopo(view) {
@@ -716,6 +758,9 @@ function atualizarAcaoTopo(view) {
     ],
     clientes: [
       { label: 'Novo Cliente', action: "abrirModalCliente()" },
+    ],
+    notasfiscais: [
+      { label: 'Nova Nota Fiscal', action: "abrirModalNotaFiscal()" },
     ],
     usuarios: [],
     configuracoes: [],
@@ -3069,6 +3114,7 @@ async function renderUsuarios() {
     { value: 'operador',    label: 'Operador' },
     { value: 'colaborador', label: 'Colaborador' },
     { value: 'controler',   label: 'Controler' },
+    { value: 'financeiro',  label: 'Financeiro' },
   ];
 
   el.innerHTML = membros.map(m => {
@@ -3319,6 +3365,185 @@ async function notificarControlersNovaCobranca(cobranca) {
     dados: { cobranca_id: cobranca.id, valor: cobranca.valor, cliente: cobranca.clienteNome },
   }));
   await supabaseClient.from('notificacoes').insert(notifs);
+}
+
+// ===== NOTAS FISCAIS =====
+function renderNotasFiscais() {
+  const el = document.getElementById('listaNotasFiscais');
+  if (!el) return;
+
+  const nfs = state.notasFiscais || [];
+
+  if (!nfs.length) {
+    el.innerHTML = `<div class="empty-state"><p>Nenhuma nota fiscal cadastrada.</p></div>`;
+    return;
+  }
+
+  el.innerHTML = `
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Cliente</th>
+          <th>Data</th>
+          <th>Valor</th>
+          <th>Descrição</th>
+          <th>Arquivo</th>
+          <th>Ações</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${nfs.map(nf => {
+          const nomeCliente = nf.clienteNome || (state.clientes.find(c => c.id === nf.clienteId)?.nome) || '—';
+          return `
+            <tr>
+              <td>${nomeCliente}</td>
+              <td>${fmtData(nf.dataNota)}</td>
+              <td>${fmt(nf.valor)}</td>
+              <td>${nf.descricao || '—'}</td>
+              <td>
+                ${nf.arquivoUrl
+                  ? `<a href="${nf.arquivoUrl}" target="_blank" class="btn-icon" title="Baixar NF" style="text-decoration:none;display:inline-flex;align-items:center;justify-content:center">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    </a>`
+                  : '<span style="color:var(--text-muted);font-size:12px">—</span>'}
+              </td>
+              <td>
+                ${(isAdm() || isFinanceiro() || isControler()) ? `
+                  <button class="btn-icon" title="Editar" onclick="abrirModalNotaFiscal('${nf.id}')">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                  </button>
+                ` : ''}
+                ${(isAdm() || isFinanceiro()) ? `
+                  <button class="btn-icon danger" title="Excluir" onclick="excluirNotaFiscal('${nf.id}')">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+                  </button>
+                ` : ''}
+              </td>
+            </tr>`;
+        }).join('')}
+      </tbody>
+    </table>`;
+}
+
+function abrirModalNotaFiscal(id) {
+  const overlay = document.getElementById('modalNotaFiscalOverlay');
+  if (!overlay) return;
+
+  const nf = id ? state.notasFiscais.find(x => x.id === id) : null;
+
+  overlay.dataset.id = id || '';
+  document.getElementById('nfClienteId').value = nf?.clienteId || '';
+  document.getElementById('nfClienteNome').value = nf?.clienteNome || '';
+  document.getElementById('nfData').value = nf?.dataNota || hoje();
+  document.getElementById('nfValor').value = nf ? fmtNumeroBR(nf.valor) : '';
+  document.getElementById('nfDescricao').value = nf?.descricao || '';
+  document.getElementById('nfObservacoes').value = nf?.observacoes || '';
+  document.getElementById('nfArquivoAtual').style.display = nf?.arquivoUrl ? '' : 'none';
+  if (nf?.arquivoUrl) {
+    document.getElementById('nfArquivoLink').href = nf.arquivoUrl;
+  }
+  document.getElementById('nfArquivo').value = '';
+
+  // Popular select de clientes
+  const sel = document.getElementById('nfClienteId');
+  sel.innerHTML = '<option value="">— Informar nome manualmente —</option>' +
+    state.clientes.map(c => `<option value="${c.id}" ${nf?.clienteId === c.id ? 'selected' : ''}>${c.nome}</option>`).join('');
+
+  overlay.classList.add('open');
+}
+
+function fecharModalNotaFiscal(event) {
+  if (event.target === document.getElementById('modalNotaFiscalOverlay')) fecharModalNotaFiscalForce();
+}
+
+function fecharModalNotaFiscalForce() {
+  document.getElementById('modalNotaFiscalOverlay')?.classList.remove('open');
+}
+
+async function salvarNotaFiscal(event) {
+  event.preventDefault();
+  const overlay = document.getElementById('modalNotaFiscalOverlay');
+  const id = overlay.dataset.id || null;
+  const btnSalvar = document.getElementById('btnSalvarNotaFiscal');
+
+  const clienteId = document.getElementById('nfClienteId').value || null;
+  const clienteNomeManual = document.getElementById('nfClienteNome').value.trim().toUpperCase();
+  const clienteExistente = clienteId ? state.clientes.find(c => c.id === clienteId) : null;
+  const clienteNome = clienteExistente ? clienteExistente.nome : (clienteNomeManual || null);
+
+  const dataNota = document.getElementById('nfData').value;
+  const valor = parseMoedaBR(document.getElementById('nfValor').value);
+  const descricao = document.getElementById('nfDescricao').value.trim();
+  const observacoes = document.getElementById('nfObservacoes').value.trim();
+
+  if (!dataNota || !valor) {
+    toast('Preencha data e valor.', 'error');
+    return;
+  }
+
+  if (btnSalvar) { btnSalvar.disabled = true; btnSalvar.textContent = 'Salvando...'; }
+
+  const nfObj = {
+    id: id || uid(),
+    clienteId,
+    clienteNome,
+    dataNota,
+    valor,
+    descricao,
+    observacoes,
+    arquivoUrl: id ? (state.notasFiscais.find(x => x.id === id)?.arquivoUrl || null) : null,
+    criadoEm: id ? undefined : new Date().toISOString(),
+  };
+
+  // Upload de PDF se selecionado
+  const fileInput = document.getElementById('nfArquivo');
+  if (fileInput?.files?.length) {
+    const file = fileInput.files[0];
+    const filePath = `${state.empresaId}/${nfObj.id}/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+    const { data: uploadData, error: uploadError } = await supabaseClient.storage
+      .from('notas-fiscais')
+      .upload(filePath, file, { upsert: true });
+    if (uploadError) {
+      console.error('Erro upload NF:', uploadError);
+      toast('Erro ao enviar arquivo: ' + uploadError.message, 'error');
+      if (btnSalvar) { btnSalvar.disabled = false; btnSalvar.textContent = 'Salvar'; }
+      return;
+    }
+    const { data: urlData } = supabaseClient.storage.from('notas-fiscais').getPublicUrl(uploadData.path);
+    nfObj.arquivoUrl = urlData.publicUrl;
+  }
+
+  const dados = notaFiscalParaDb(nfObj);
+
+  if (id) {
+    const { error } = await supabaseClient.from('notas_fiscais').update(dados).eq('id', id);
+    if (btnSalvar) { btnSalvar.disabled = false; btnSalvar.textContent = 'Salvar'; }
+    if (error) { console.error(error); toast('Erro ao atualizar nota fiscal', 'error'); return; }
+    const idx = state.notasFiscais.findIndex(x => x.id === id);
+    if (idx !== -1) state.notasFiscais[idx] = nfObj;
+    toast('Nota fiscal atualizada!', 'success');
+  } else {
+    const { error } = await supabaseClient.from('notas_fiscais').insert([dados]);
+    if (btnSalvar) { btnSalvar.disabled = false; btnSalvar.textContent = 'Salvar'; }
+    if (error) { console.error(error); toast('Erro ao cadastrar nota fiscal', 'error'); return; }
+    state.notasFiscais.unshift(nfObj);
+    toast('Nota fiscal cadastrada!', 'success');
+  }
+
+  fecharModalNotaFiscalForce();
+  renderNotasFiscais();
+}
+
+async function excluirNotaFiscal(id) {
+  const nf = state.notasFiscais.find(x => x.id === id);
+  if (!nf) return;
+  if (!confirm(`Excluir nota fiscal${nf.clienteNome ? ' de ' + nf.clienteNome : ''}?`)) return;
+  state.notasFiscais = state.notasFiscais.filter(x => x.id !== id);
+  supabaseClient.from('notas_fiscais').delete().eq('id', id).then(({ error }) => {
+    if (error) console.error('Erro ao excluir nota fiscal:', error);
+  });
+  renderNotasFiscais();
+  toast('Nota fiscal excluída');
 }
 
 // ===== INIT =====
