@@ -2100,7 +2100,7 @@ function abrirModalCliente(id) {
     document.getElementById('editClienteId').value = c.id;
     document.getElementById('modalClienteTitulo').textContent = 'Editar Cliente';
     document.getElementById('cNome').value = c.nome;
-    document.getElementById('ccpf_cnpj').value = c.cpf_cnpj || '';
+    document.getElementById('cCpfCnpj').value = c.cpf_cnpj || '';
     document.getElementById('cTelefone').value = c.telefone || '';
     document.getElementById('cEmail').value = c.email || '';
     document.getElementById('cEndereco').value = c.endereco || '';
@@ -2134,7 +2134,7 @@ async function salvarCliente(event) {
 
   const dados = {
     nome: document.getElementById('cNome').value.trim(),
-    cpf_cnpj: document.getElementById('ccpf_cnpj').value.trim(),
+    cpf_cnpj: document.getElementById('cCpfCnpj').value.trim(),
     telefone: document.getElementById('cTelefone').value.trim(),
     email: document.getElementById('cEmail').value.trim(),
     endereco: document.getElementById('cEndereco').value.trim(),
