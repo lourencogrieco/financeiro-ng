@@ -693,6 +693,7 @@ function atualizarAcaoTopo(view) {
       { label: 'Nova Cobrança', action: "abrirModalCobranca()" },
       { label: 'Nova Conta a Pagar', action: "abrirModalContaPagar()" },
       { label: 'Nova Despesa', action: "abrirModalDespesa()" },
+      { label: 'Novo Cliente', action: "abrirModalCliente()" },
       { label: 'Emitir Relatórios', action: "navegarPara('relatorios')" },
     ],
     cobrancas: [
