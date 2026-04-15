@@ -1268,14 +1268,23 @@ function salvarCobranca(event) {
 
 function proximaData(base, rec) {
   const d = new Date(base);
+  const diaOriginal = d.getDate();
+
+  function avancaMeses(n) {
+    d.setDate(1); // evita overflow ao mudar o mês
+    d.setMonth(d.getMonth() + n);
+    const ultimoDia = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+    d.setDate(Math.min(diaOriginal, ultimoDia));
+  }
+
   switch (rec) {
-    case 'semanal': d.setDate(d.getDate() + 7); break;
-    case 'quinzenal': d.setDate(d.getDate() + 15); break;
-    case 'mensal': d.setMonth(d.getMonth() + 1); break;
-    case 'bimestral': d.setMonth(d.getMonth() + 2); break;
-    case 'trimestral': d.setMonth(d.getMonth() + 3); break;
-    case 'semestral': d.setMonth(d.getMonth() + 6); break;
-    case 'anual': d.setFullYear(d.getFullYear() + 1); break;
+    case 'semanal':    d.setDate(d.getDate() + 7); break;
+    case 'quinzenal':  d.setDate(d.getDate() + 15); break;
+    case 'mensal':     avancaMeses(1);  break;
+    case 'bimestral':  avancaMeses(2);  break;
+    case 'trimestral': avancaMeses(3);  break;
+    case 'semestral':  avancaMeses(6);  break;
+    case 'anual':      avancaMeses(12); break;
   }
   return d;
 }
