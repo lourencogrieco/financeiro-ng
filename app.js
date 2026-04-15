@@ -2634,21 +2634,24 @@ async function renderUsuarios() {
     const isMe = m.user_id === state.meuPerfil?.userId;
     const perfilInfo = PERFIS[m.perfil] || { label: m.perfil, cor: 'badge-pendente' };
     const optsHtml = perfisOpcoes.map(o => `<option value="${o.value}" ${m.perfil === o.value ? 'selected' : ''}>${o.label}</option>`).join('');
+    const nomeEsc = m.nome.replace(/'/g, "\\'");
     return `
       <div class="team-member-item">
         <div class="team-avatar">${ini}</div>
         <div class="team-info">
           <div class="team-nome">${m.nome}${isMe ? ' <span style="font-size:11px;color:var(--text-muted)">(você)</span>' : ''}</div>
-          <div class="team-desde">${m.cargo ? `${m.cargo} · ` : ''}Membro desde ${fmtData(m.criado_em?.slice(0, 10))}</div>
+          <div class="team-desde">${m.cargo ? `${m.cargo} · ` : ''}Desde ${fmtData(m.criado_em?.slice(0, 10))}</div>
         </div>
-        ${isAdmin && !isMe
-          ? `<select class="input perfil-select" onchange="alterarPerfilMembro('${m.user_id}',this.value,'${m.nome.replace(/'/g,"\\'")}',this)">${optsHtml}</select>`
-          : `<span class="badge ${perfilInfo.cor}">${perfilInfo.label}</span>`
-        }
-        ${isAdmin && !isMe ? `
-        <button class="btn-icon danger" style="margin-left:4px" title="Remover da equipe" onclick="removerMembro('${m.user_id}','${m.nome.replace(/'/g,"\\'")}')">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
-        </button>` : ''}
+        <div class="team-actions">
+          ${isAdmin && !isMe
+            ? `<select class="perfil-select" onchange="alterarPerfilMembro('${m.user_id}',this.value,'${nomeEsc}',this)">${optsHtml}</select>`
+            : `<span class="badge ${perfilInfo.cor}">${perfilInfo.label}</span>`
+          }
+          ${isAdmin && !isMe ? `
+          <button class="btn-icon danger" title="Remover da equipe" onclick="removerMembro('${m.user_id}','${nomeEsc}')">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+          </button>` : ''}
+        </div>
       </div>`;
   }).join('');
 }
