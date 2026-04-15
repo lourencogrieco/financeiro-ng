@@ -1146,3 +1146,129 @@ form { padding: 20px 24px 0; }
   gap: 8px;
   flex-wrap: wrap;
 }
+
+/* ===== Badge extras (perfis) ===== */
+.badge-parcial { background: #eff6ff; color: #1e40af; }
+.badge-info    { background: #eff6ff; color: #1e40af; }
+
+/* ===== Perfil select em usuários ===== */
+.perfil-select {
+  font-size: 12px;
+  padding: 4px 8px;
+  height: 30px;
+  min-width: 130px;
+  border-radius: var(--radius);
+}
+
+/* ===== Notificações ===== */
+.topbar-notif {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.btn-notif {
+  position: relative;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 8px;
+  border-radius: var(--radius);
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  transition: background .15s, color .15s;
+}
+.btn-notif:hover { background: var(--bg); color: var(--primary); }
+
+.notif-badge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  background: var(--danger);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  min-width: 16px;
+  height: 16px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 3px;
+  line-height: 1;
+}
+
+.notif-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 320px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-md);
+  z-index: 200;
+  overflow: hidden;
+  max-height: 420px;
+  display: flex;
+  flex-direction: column;
+}
+
+.notif-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  font-weight: 600;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+.btn-link {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--primary);
+  font-size: 12px;
+  padding: 0;
+}
+.btn-link:hover { text-decoration: underline; }
+
+#notifLista {
+  overflow-y: auto;
+  flex: 1;
+}
+
+.notif-item {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  background: var(--primary-light);
+  transition: background .12s;
+}
+.notif-item:hover { background: #e0e7ff; }
+.notif-item.notif-lida { background: var(--surface); }
+.notif-item.notif-lida:hover { background: var(--bg); }
+
+.notif-titulo {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--text);
+  margin-bottom: 2px;
+}
+.notif-msg {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+.notif-hora {
+  font-size: 11px;
+  color: var(--text-light);
+}
+.notif-empty {
+  padding: 24px 16px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 13px;
+}

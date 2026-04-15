@@ -107,7 +107,8 @@ async function inicializarContextoEmpresa(user) {
   atualizarStatusAuto();
   atualizarStatusAutoCP();
   popularClientesForms();
-  navegarPara('dashboard');
+  await carregarNotificacoes();
+  navegarPara(isColaborador() ? 'cobrancas' : 'dashboard');
 }
 
 // ===== STATE =====
@@ -147,6 +148,7 @@ let state = {
   contasPagar: [],
   contadores: { notaDebito: 0, recibo: 0 },
   config: { diasAlerta: 7 },
+  notificacoes: [],
 };
 
 let viewAtual = 'dashboard';
@@ -195,6 +197,35 @@ function nomeMes(n) {
 
 function mesesNome() {
   return ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+}
+
+function fmtDataHora(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return d.toLocaleDateString('pt-BR') + ' ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+}
+
+// ===== PERFIS E PERMISSÕES =====
+const PERFIS = {
+  admin:       { label: 'Administrador', cor: 'badge-pago' },
+  adm:         { label: 'Administrador', cor: 'badge-pago' },
+  operador:    { label: 'Operador',      cor: 'badge-pendente' },
+  colaborador: { label: 'Colaborador',   cor: 'badge-parcial' },
+  controler:   { label: 'Controler',     cor: 'badge-vencido' },
+};
+
+function perfilAtual() { return state.meuPerfil?.perfil || ''; }
+function isAdm()         { const p = perfilAtual(); return p === 'admin' || p === 'adm'; }
+function isColaborador() { return perfilAtual() === 'colaborador'; }
+function isControler()   { return perfilAtual() === 'controler'; }
+
+function podeAcessarView(view) {
+  if (isAdm()) return true;
+  // colaborador e operador e controler não acessam áreas administrativas
+  if (['usuarios', 'configuracoes'].includes(view)) return false;
+  // colaborador não acessa dashboard nem relatórios
+  if (isColaborador() && ['dashboard', 'relatorios'].includes(view)) return false;
+  return true;
 }
 
 function corCategoria(nome) {
@@ -477,6 +508,7 @@ async function criarEmpresa() {
   atualizarStatusAuto();
   atualizarStatusAutoCP();
   popularClientesForms();
+  await carregarNotificacoes();
   navegarPara('dashboard');
 }
 
@@ -522,7 +554,8 @@ async function entrarComCodigo() {
   atualizarStatusAuto();
   atualizarStatusAutoCP();
   popularClientesForms();
-  navegarPara('dashboard');
+  await carregarNotificacoes();
+  navegarPara(isColaborador() ? 'cobrancas' : 'dashboard');
 }
 
 function renderSidebarUser() {
@@ -536,15 +569,22 @@ function renderSidebarUser() {
   document.getElementById('userNome').textContent = nome;
   const cargoEl = document.getElementById('userCargo');
   if (cargoEl) { cargoEl.textContent = cargo || ''; cargoEl.style.display = cargo ? '' : 'none'; }
-  document.getElementById('userRole').textContent = perfil === 'admin' ? 'Admin' : 'Operador';
+  const info = PERFIS[perfil] || { label: perfil, cor: 'badge-pendente' };
+  const roleEl = document.getElementById('userRole');
+  if (roleEl) { roleEl.textContent = info.label; roleEl.className = `user-role ${info.cor}`; }
 
   // Empresa name in sidebar header
   const empresaEl = document.getElementById('sidebarEmpresaName');
   if (empresaEl) empresaEl.textContent = state.empresaNome || '';
+
+  // Ocultar itens de nav sem permissão
+  document.querySelectorAll('.nav-item[data-view]').forEach(a => {
+    a.style.display = podeAcessarView(a.dataset.view) ? '' : 'none';
+  });
 }
 
 async function gerarConvite() {
-  if (state.meuPerfil?.perfil !== 'admin') {
+  if (!isAdm()) {
     toast('Apenas administradores podem gerar convites.', 'error');
     return;
   }
@@ -592,12 +632,12 @@ async function renderEquipe() {
           <div class="team-nome">${m.nome}${isMe ? ' <span style="font-size:11px;color:var(--text-muted)">(você)</span>' : ''}</div>
           <div class="team-desde">Desde ${fmtData(m.criado_em?.slice(0, 10))}</div>
         </div>
-        <span class="badge ${m.perfil === 'admin' ? 'badge-pago' : 'badge-pendente'}">${m.perfil === 'admin' ? 'Admin' : 'Operador'}</span>
+        <span class="badge ${(PERFIS[m.perfil] || PERFIS.operador).cor}">${(PERFIS[m.perfil] || { label: m.perfil }).label}</span>
       </div>`;
   }).join('');
 
   const btn = document.getElementById('btnGerarConvite');
-  if (btn) btn.style.display = state.meuPerfil?.perfil === 'admin' ? '' : 'none';
+  if (btn) btn.style.display = isAdm() ? '' : 'none';
 }
 
 // ===== STATUS AUTO =====
@@ -618,6 +658,10 @@ function atualizarStatusAuto() {
 
 // ===== NAVEGAÇÃO =====
 function navegarPara(view) {
+  if (!podeAcessarView(view)) {
+    toast('Sem permissão para acessar esta área.', 'error');
+    return;
+  }
   viewAtual = view;
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
@@ -1105,6 +1149,7 @@ function salvarCobranca(event) {
     supabaseClient.from('cobrancas').insert(novasCobrancas.map(c => cobrancaParaDb(c))).then(({ error }) => {
       if (error) console.error('Erro ao inserir cobranças:', error);
     });
+    notificarControlersNovaCobranca(novasCobrancas[0]);
     toast(`${qtd} cobrança${qtd !== 1 ? 's' : ''} criada${qtd !== 1 ? 's' : ''}!`, 'success');
   }
 
@@ -2563,7 +2608,7 @@ async function renderUsuarios() {
   const btnConvidar = document.getElementById('btnConvidarUsuario');
   if (!el || !state.empresaId) return;
 
-  const isAdmin = state.meuPerfil?.perfil === 'admin';
+  const isAdmin = isAdm();
   if (btnConvidar) btnConvidar.style.display = isAdmin ? 'flex' : 'none';
 
   const { data: membros, error } = await supabaseClient
@@ -2577,9 +2622,18 @@ async function renderUsuarios() {
     return;
   }
 
+  const perfisOpcoes = [
+    { value: 'admin',       label: 'Administrador' },
+    { value: 'operador',    label: 'Operador' },
+    { value: 'colaborador', label: 'Colaborador' },
+    { value: 'controler',   label: 'Controler' },
+  ];
+
   el.innerHTML = membros.map(m => {
     const ini = (m.nome || '?').split(' ').filter(Boolean).map(w => w[0]).join('').slice(0, 2).toUpperCase();
     const isMe = m.user_id === state.meuPerfil?.userId;
+    const perfilInfo = PERFIS[m.perfil] || { label: m.perfil, cor: 'badge-pendente' };
+    const optsHtml = perfisOpcoes.map(o => `<option value="${o.value}" ${m.perfil === o.value ? 'selected' : ''}>${o.label}</option>`).join('');
     return `
       <div class="team-member-item">
         <div class="team-avatar">${ini}</div>
@@ -2587,24 +2641,26 @@ async function renderUsuarios() {
           <div class="team-nome">${m.nome}${isMe ? ' <span style="font-size:11px;color:var(--text-muted)">(você)</span>' : ''}</div>
           <div class="team-desde">${m.cargo ? `${m.cargo} · ` : ''}Membro desde ${fmtData(m.criado_em?.slice(0, 10))}</div>
         </div>
-        <span class="badge ${m.perfil === 'admin' ? 'badge-pago' : 'badge-pendente'}">${m.perfil === 'admin' ? 'Admin' : 'Operador'}</span>
+        ${isAdmin && !isMe
+          ? `<select class="input perfil-select" onchange="alterarPerfilMembro('${m.user_id}',this.value,'${m.nome.replace(/'/g,"\\'")}',this)">${optsHtml}</select>`
+          : `<span class="badge ${perfilInfo.cor}">${perfilInfo.label}</span>`
+        }
         ${isAdmin && !isMe ? `
-        <div class="actions" style="margin-left:8px">
-          <button class="btn-icon" title="${m.perfil === 'admin' ? 'Rebaixar para Operador' : 'Promover a Admin'}" onclick="alterarPerfilMembro('${m.user_id}','${m.perfil === 'admin' ? 'operador' : 'admin'}','${m.nome}')">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-          </button>
-          <button class="btn-icon danger" title="Remover da equipe" onclick="removerMembro('${m.user_id}','${m.nome}')">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
-          </button>
-        </div>` : ''}
+        <button class="btn-icon danger" style="margin-left:4px" title="Remover da equipe" onclick="removerMembro('${m.user_id}','${m.nome.replace(/'/g,"\\'")}')">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+        </button>` : ''}
       </div>`;
   }).join('');
 }
 
-async function alterarPerfilMembro(userId, novoPerfil, nome) {
-  if (state.meuPerfil?.perfil !== 'admin') return;
-  const acao = novoPerfil === 'admin' ? 'promover' : 'rebaixar';
-  if (!confirm(`${acao.charAt(0).toUpperCase() + acao.slice(1)} "${nome}"?`)) return;
+async function alterarPerfilMembro(userId, novoPerfil, nome, selectEl) {
+  if (!isAdm()) return;
+  const perfilLabel = PERFIS[novoPerfil]?.label || novoPerfil;
+  if (!confirm(`Alterar perfil de "${nome}" para "${perfilLabel}"?`)) {
+    // revert select
+    if (selectEl) { const { data } = await supabaseClient.from('usuarios_empresa').select('perfil').eq('user_id', userId).eq('empresa_id', state.empresaId).single(); if (data) selectEl.value = data.perfil; }
+    return;
+  }
   const { error } = await supabaseClient
     .from('usuarios_empresa')
     .update({ perfil: novoPerfil })
@@ -2616,7 +2672,7 @@ async function alterarPerfilMembro(userId, novoPerfil, nome) {
 }
 
 async function removerMembro(userId, nome) {
-  if (state.meuPerfil?.perfil !== 'admin') return;
+  if (!isAdm()) return;
   if (!confirm(`Remover "${nome}" da equipe? O usuário perderá o acesso à empresa.`)) return;
   const { error } = await supabaseClient
     .from('usuarios_empresa')
@@ -2634,7 +2690,7 @@ function abrirConviteUsuarios() {
 }
 
 async function gerarConviteUsuarios() {
-  if (state.meuPerfil?.perfil !== 'admin') {
+  if (!isAdm()) {
     toast('Apenas administradores podem gerar convites.', 'error');
     return;
   }
@@ -2689,6 +2745,100 @@ function limparContrato() {
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
       <span>Clique para anexar contrato</span>`;
   }
+}
+
+// ===== NOTIFICAÇÕES =====
+async function carregarNotificacoes() {
+  if (!state.meuPerfil || !state.empresaId) return;
+  const { data } = await supabaseClient
+    .from('notificacoes')
+    .select('*')
+    .eq('user_id', state.meuPerfil.userId)
+    .eq('empresa_id', state.empresaId)
+    .order('created_at', { ascending: false })
+    .limit(30);
+  state.notificacoes = data || [];
+  renderBadgeNotificacoes();
+}
+
+function renderBadgeNotificacoes() {
+  const naoLidas = (state.notificacoes || []).filter(n => !n.lida).length;
+  const badge = document.getElementById('notifBadge');
+  if (badge) { badge.textContent = naoLidas > 9 ? '9+' : naoLidas; badge.style.display = naoLidas > 0 ? '' : 'none'; }
+}
+
+function abrirNotificacoes() {
+  const panel = document.getElementById('notifPanel');
+  if (!panel) return;
+  const isOpen = panel.style.display !== 'none';
+  panel.style.display = isOpen ? 'none' : '';
+  if (!isOpen) renderNotificacoesPanel();
+  // Fechar ao clicar fora
+  if (!isOpen) {
+    setTimeout(() => {
+      document.addEventListener('click', function fecharFora(e) {
+        if (!panel.contains(e.target) && !e.target.closest('.btn-notif')) {
+          panel.style.display = 'none';
+          document.removeEventListener('click', fecharFora);
+        }
+      });
+    }, 100);
+  }
+}
+
+function renderNotificacoesPanel() {
+  const lista = document.getElementById('notifLista');
+  if (!lista) return;
+  const notifs = state.notificacoes || [];
+  if (!notifs.length) {
+    lista.innerHTML = '<div class="notif-empty">Nenhuma notificação</div>';
+    return;
+  }
+  lista.innerHTML = notifs.map(n => `
+    <div class="notif-item${n.lida ? ' notif-lida' : ''}" onclick="marcarNotificacaoLida('${n.id}')">
+      <div class="notif-titulo">${n.titulo}</div>
+      ${n.mensagem ? `<div class="notif-msg">${n.mensagem}</div>` : ''}
+      <div class="notif-hora">${fmtDataHora(n.created_at)}</div>
+    </div>
+  `).join('');
+}
+
+async function marcarNotificacaoLida(id) {
+  await supabaseClient.from('notificacoes').update({ lida: true }).eq('id', id);
+  const n = (state.notificacoes || []).find(n => n.id === id);
+  if (n) n.lida = true;
+  renderBadgeNotificacoes();
+  renderNotificacoesPanel();
+}
+
+async function marcarTodasLidas() {
+  const ids = (state.notificacoes || []).filter(n => !n.lida).map(n => n.id);
+  if (!ids.length) return;
+  await supabaseClient.from('notificacoes').update({ lida: true }).in('id', ids);
+  (state.notificacoes || []).forEach(n => { n.lida = true; });
+  renderBadgeNotificacoes();
+  renderNotificacoesPanel();
+}
+
+async function notificarControlersNovaCobranca(cobranca) {
+  if (!state.empresaId) return;
+  const { data: controlers } = await supabaseClient
+    .from('usuarios_empresa')
+    .select('user_id')
+    .eq('empresa_id', state.empresaId)
+    .eq('perfil', 'controler');
+  if (!controlers?.length) return;
+
+  const quemLancou = state.meuPerfil?.nome || 'Usuário';
+  const notifs = controlers.map(c => ({
+    empresa_id: state.empresaId,
+    user_id: c.user_id,
+    tipo: 'nova_cobranca',
+    titulo: 'Nova cobrança — emitir NF',
+    mensagem: `${cobranca.clienteNome || 'Cliente'} · ${cobranca.descricao || ''} · ${fmt(cobranca.valor)} · Lançado por ${quemLancou}`,
+    dados: { cobranca_id: cobranca.id, valor: cobranca.valor, cliente: cobranca.clienteNome },
+  }));
+  await supabaseClient.from('notificacoes').insert(notifs);
 }
 
 // ===== INIT =====

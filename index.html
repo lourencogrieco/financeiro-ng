@@ -151,6 +151,20 @@
     </button>
     <h1 class="page-title" id="pageTitle">Dashboard</h1>
     <div class="topbar-actions" id="topbarActions"></div>
+    <!-- Notificações -->
+    <div class="topbar-notif">
+      <button class="btn-notif" onclick="abrirNotificacoes()" title="Notificações">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        <span class="notif-badge" id="notifBadge" style="display:none">0</span>
+      </button>
+      <div class="notif-panel" id="notifPanel" style="display:none">
+        <div class="notif-header">
+          <span>Notificações</span>
+          <button class="btn-link" onclick="marcarTodasLidas()">Marcar todas como lidas</button>
+        </div>
+        <div id="notifLista"></div>
+      </div>
+    </div>
   </header>
 
   <!-- VIEWS -->
