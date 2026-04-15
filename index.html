@@ -290,10 +290,23 @@
     <div class="resumo-mes" id="resumo-mes"></div>
     <div class="table-summary" id="table-summary"></div>
 
+    <div id="bulkBarCobrancas" class="bulk-bar" style="display:none">
+      <span class="bulk-count"></span>
+      <button class="btn btn-outline" onclick="abrirEdicaoEmMassaCobrancas()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        Editar selecionados
+      </button>
+      <button class="btn btn-danger" onclick="excluirSelecionadosCobrancas()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+        Excluir selecionados
+      </button>
+      <button class="btn btn-outline" style="margin-left:auto" onclick="limparSelecaoCobrancas()">Cancelar</button>
+    </div>
     <div class="table-wrap">
       <table class="table" id="tabelaCobrancas">
         <thead>
           <tr>
+            <th style="width:36px;padding:0 8px"><input type="checkbox" id="checkTodosCobrancas" onclick="toggleTodosCobrancas()" title="Selecionar todos"></th>
             <th class="sortable-th"><button type="button" class="table-sort-btn" onclick="ordenarTabela('cobrancas', 'descricao')">Descrição <span id="sort-cobrancas-descricao" class="sort-indicator"></span></button></th>
             <th class="sortable-th"><button type="button" class="table-sort-btn" onclick="ordenarTabela('cobrancas', 'cliente')">Cliente <span id="sort-cobrancas-cliente" class="sort-indicator"></span></button></th>
             <th class="sortable-th"><button type="button" class="table-sort-btn" onclick="ordenarTabela('cobrancas', 'categoria')">Categoria <span id="sort-cobrancas-categoria" class="sort-indicator"></span></button></th>
@@ -488,10 +501,23 @@
     </div>
     <div id="resumo-mes-cp" style="margin-bottom:14px"></div>
     <div class="table-summary" id="cp-summary"></div>
+    <div id="bulkBarCP" class="bulk-bar" style="display:none">
+      <span class="bulk-count"></span>
+      <button class="btn btn-outline" onclick="abrirEdicaoEmMassaCP()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        Editar selecionados
+      </button>
+      <button class="btn btn-danger" onclick="excluirSelecionadosCP()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+        Excluir selecionados
+      </button>
+      <button class="btn btn-outline" style="margin-left:auto" onclick="limparSelecaoCP()">Cancelar</button>
+    </div>
     <div class="table-wrap">
       <table class="table">
         <thead>
           <tr>
+            <th style="width:36px;padding:0 8px"><input type="checkbox" id="checkTodosCP" onclick="toggleTodosCP()" title="Selecionar todos"></th>
             <th class="sortable-th"><button type="button" class="table-sort-btn" onclick="ordenarTabela('contaspagar', 'descricao')">Descrição <span id="sort-contaspagar-descricao" class="sort-indicator"></span></button></th>
             <th class="sortable-th"><button type="button" class="table-sort-btn" onclick="ordenarTabela('contaspagar', 'tipo')">Tipo <span id="sort-contaspagar-tipo" class="sort-indicator"></span></button></th>
             <th class="sortable-th"><button type="button" class="table-sort-btn" onclick="ordenarTabela('contaspagar', 'dataVencimento')">Vencimento <span id="sort-contaspagar-dataVencimento" class="sort-indicator"></span></button></th>
@@ -923,6 +949,122 @@
       <button class="btn btn-outline" onclick="fecharModalBaixaForce()">Cancelar</button>
       <button class="btn btn-success" onclick="confirmarBaixa()">Confirmar Pagamento</button>
     </div>
+  </div>
+</div>
+
+<!-- Modal Edição em Massa - Cobranças -->
+<div class="modal-overlay" id="modalBulkCobrancasOverlay" onclick="fecharBulkCobrancas(event)">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-header">
+      <h2 id="modalBulkCTitulo">Editar Selecionados</h2>
+      <button class="modal-close" onclick="fecharBulkCobrancasForce()">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px">Deixe em branco para manter o valor original de cada lançamento.</p>
+    <form id="formBulkCobrancas" onsubmit="salvarEdicaoEmMassaCobrancas(event)">
+      <div class="form-row">
+        <div class="form-group flex2">
+          <label>Descrição</label>
+          <input type="text" class="input" id="bulkCDescricao" maxlength="100" placeholder="Manter original...">
+        </div>
+        <div class="form-group">
+          <label>Valor (R$)</label>
+          <input type="text" class="input money-input" id="bulkCValor" inputmode="decimal" autocomplete="off" placeholder="Manter...">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group flex2">
+          <label>Categoria</label>
+          <select class="input" id="bulkCCategoria">
+            <option value="">— Manter original</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Recorrência</label>
+          <select class="input" id="bulkCRecorrencia">
+            <option value="">— Manter original</option>
+            <option value="nenhuma">Sem recorrência</option>
+            <option value="semanal">Semanal</option>
+            <option value="quinzenal">Quinzenal</option>
+            <option value="mensal">Mensal</option>
+            <option value="bimestral">Bimestral</option>
+            <option value="trimestral">Trimestral</option>
+            <option value="semestral">Semestral</option>
+            <option value="anual">Anual</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Observações</label>
+        <textarea class="input" id="bulkCObservacoes" rows="2" maxlength="300" placeholder="Manter original..."></textarea>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" onclick="fecharBulkCobrancasForce()">Cancelar</button>
+        <button type="submit" class="btn btn-primary">Aplicar a todos</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal Edição em Massa - Contas a Pagar -->
+<div class="modal-overlay" id="modalBulkCPOverlay" onclick="fecharBulkCP(event)">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-header">
+      <h2 id="modalBulkCPTitulo">Editar Selecionados</h2>
+      <button class="modal-close" onclick="fecharBulkCPForce()">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px">Deixe em branco para manter o valor original de cada lançamento.</p>
+    <form id="formBulkCP" onsubmit="salvarEdicaoEmMassaCP(event)">
+      <div class="form-row">
+        <div class="form-group flex2">
+          <label>Descrição</label>
+          <input type="text" class="input" id="bulkCPDescricao" maxlength="100" placeholder="Manter original...">
+        </div>
+        <div class="form-group">
+          <label>Valor (R$)</label>
+          <input type="text" class="input money-input" id="bulkCPValor" inputmode="decimal" autocomplete="off" placeholder="Manter...">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group flex2">
+          <label>Tipo</label>
+          <select class="input" id="bulkCPTipo">
+            <option value="">— Manter original</option>
+            <option>Prestadores de Serviço</option>
+            <option>Tributos / Impostos</option>
+            <option>Notas Fiscais</option>
+            <option>Folha de Pagamento</option>
+            <option>Aluguel / Locações</option>
+            <option>Outros</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Recorrência</label>
+          <select class="input" id="bulkCPRecorrencia">
+            <option value="">— Manter original</option>
+            <option value="nenhuma">Sem recorrência</option>
+            <option value="semanal">Semanal</option>
+            <option value="quinzenal">Quinzenal</option>
+            <option value="mensal">Mensal</option>
+            <option value="bimestral">Bimestral</option>
+            <option value="trimestral">Trimestral</option>
+            <option value="semestral">Semestral</option>
+            <option value="anual">Anual</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Observações</label>
+        <textarea class="input" id="bulkCPObservacoes" rows="2" maxlength="300" placeholder="Manter original..."></textarea>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" onclick="fecharBulkCPForce()">Cancelar</button>
+        <button type="submit" class="btn btn-primary">Aplicar a todos</button>
+      </div>
+    </form>
   </div>
 </div>
 

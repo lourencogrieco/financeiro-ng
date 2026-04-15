@@ -864,6 +864,38 @@ form { padding: 20px 24px 0; }
 
 .invite-instructions { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
 
+/* ===== Seleção em massa ===== */
+.bulk-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  margin-bottom: 10px;
+  background: var(--primary-light, #ede9fe);
+  border: 1px solid var(--primary);
+  border-radius: var(--radius);
+  flex-wrap: wrap;
+}
+.bulk-bar .bulk-count {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--primary);
+  margin-right: 4px;
+}
+.table tbody tr.row-selected > td {
+  background: var(--primary-light, #ede9fe);
+}
+.table tbody tr.row-selected:hover > td {
+  background: #ddd6fe;
+}
+.table th input[type=checkbox],
+.table td input[type=checkbox] {
+  width: 15px;
+  height: 15px;
+  cursor: pointer;
+  accent-color: var(--primary);
+}
+
 /* ===== Recorrencia badge ===== */
 .rec-badge {
   display: inline-block;

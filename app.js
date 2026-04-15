@@ -155,6 +155,8 @@ let viewAtual = 'dashboard';
 let baixaIdAtual = null;
 let editarMembroAtivo = null;
 let baixaColecao = 'cobrancas'; // 'cobrancas' | 'contaspagar'
+let selecionadosCobrancas = new Set();
+let selecionadosCP = new Set();
 let chartCategoria = null;
 let chartEvolucao = null;
 let chartRelCategoria = null;
@@ -357,6 +359,7 @@ function cobrancaParaDb(c) {
     status: c.status, data_pagamento: c.dataPagamento || null,
     valor_pago: c.valorPago != null ? c.valorPago : null,
     criado_em: c.criadoEm || new Date().toISOString(),
+    grupo_id: c.grupoId || null,
   };
 }
 function dbParaCobranca(row) {
@@ -368,6 +371,7 @@ function dbParaCobranca(row) {
     dataPagamento: row.data_pagamento,
     valorPago: row.valor_pago != null ? Number(row.valor_pago) : null,
     criadoEm: row.criado_em,
+    grupoId: row.grupo_id || null,
   };
 }
 
@@ -406,6 +410,7 @@ function contaPagarParaDb(cp) {
     status: cp.status, data_pagamento: cp.dataPagamento || null,
     valor_pago: cp.valorPago != null ? cp.valorPago : null,
     criado_em: cp.criadoEm || new Date().toISOString(),
+    grupo_id: cp.grupoId || null,
   };
 }
 function dbParaContaPagar(row) {
@@ -416,6 +421,7 @@ function dbParaContaPagar(row) {
     dataPagamento: row.data_pagamento,
     valorPago: row.valor_pago != null ? Number(row.valor_pago) : null,
     criadoEm: row.criado_em,
+    grupoId: row.grupo_id || null,
   };
 }
 
@@ -990,7 +996,8 @@ function renderCobrancas() {
   } else {
     empty.style.display = 'none';
     tbody.innerHTML = lista.map(c => `
-      <tr>
+      <tr class="${selecionadosCobrancas.has(c.id) ? 'row-selected' : ''}">
+        <td style="padding:0 8px"><input type="checkbox" data-id="${c.id}" ${selecionadosCobrancas.has(c.id) ? 'checked' : ''} onchange="toggleSelecionadoCobranca('${c.id}')"></td>
         <td>
           <div style="font-weight:600">${c.descricao}</div>
           ${c.observacoes ? `<div style="font-size:11px;color:var(--text-muted)">${c.observacoes}</div>` : ''}
@@ -1028,6 +1035,14 @@ function renderCobrancas() {
         </td>
       </tr>
     `).join('');
+
+    // Atualizar estado do checkbox "selecionar todos"
+    const checkAll = document.getElementById('checkTodosCobrancas');
+    if (checkAll) {
+      const checkboxes = document.querySelectorAll('#tabelaBody input[type=checkbox]');
+      checkAll.checked = checkboxes.length > 0 && [...checkboxes].every(cb => cb.checked);
+      checkAll.indeterminate = !checkAll.checked && [...checkboxes].some(cb => cb.checked);
+    }
   }
 }
 
@@ -1109,12 +1124,29 @@ function salvarCobranca(event) {
     // Editar
     const idx = state.cobrancas.findIndex(c => c.id === id);
     if (idx !== -1) {
-      state.cobrancas[idx] = { ...state.cobrancas[idx], clienteId, clienteNome, descricao, valor, dataVencimento, categoria, recorrencia, observacoes };
+      const original = state.cobrancas[idx];
+      state.cobrancas[idx] = { ...original, clienteId, clienteNome, descricao, valor, dataVencimento, categoria, recorrencia, observacoes };
       atualizarStatusAuto();
-      const atualizado = state.cobrancas[idx];
-      supabaseClient.from('cobrancas').update(cobrancaParaDb(atualizado)).eq('id', id).then(({ error }) => {
+      supabaseClient.from('cobrancas').update(cobrancaParaDb(state.cobrancas[idx])).eq('id', id).then(({ error }) => {
         if (error) console.error('Erro ao atualizar cobrança:', error);
       });
+
+      // Perguntar se quer atualizar demais lançamentos da série
+      const grupoId = original.grupoId;
+      const temSiblings = grupoId && state.cobrancas.some(c => c.grupoId === grupoId && c.id !== id);
+      if (original.recorrencia && original.recorrencia !== 'nenhuma' && temSiblings) {
+        if (confirm('Este lançamento faz parte de uma série recorrente.\nDeseja atualizar os demais lançamentos da série também?\n\n(Datas de vencimento e status de pagamento não serão alterados)')) {
+          state.cobrancas.forEach((c, i) => {
+            if (c.grupoId === grupoId && c.id !== id) {
+              state.cobrancas[i] = { ...c, clienteId, clienteNome, descricao, valor, categoria, recorrencia, observacoes };
+              supabaseClient.from('cobrancas').update(cobrancaParaDb(state.cobrancas[i])).eq('id', c.id).then(({ error }) => {
+                if (error) console.error('Erro ao atualizar cobrança recorrente:', error);
+              });
+            }
+          });
+          atualizarStatusAuto();
+        }
+      }
     }
     toast('Cobrança atualizada!', 'success');
   } else {
@@ -1122,6 +1154,7 @@ function salvarCobranca(event) {
     const qtd = recorrencia !== 'nenhuma' ? repeticoes : 1;
     let base = new Date(dataVencimento + 'T00:00:00');
     const novasCobrancas = [];
+    const grupoId = recorrencia !== 'nenhuma' ? uid() : null;
 
     for (let i = 0; i < qtd; i++) {
       const d = new Date(base);
@@ -1140,6 +1173,7 @@ function salvarCobranca(event) {
         dataPagamento: null,
         valorPago: null,
         criadoEm: new Date().toISOString(),
+        grupoId,
       };
       novaC.status = calcularStatus(novaC);
       state.cobrancas.push(novaC);
@@ -1184,6 +1218,225 @@ function excluirCobranca(id) {
   });
   renderCobrancas();
   toast('Cobrança excluída');
+}
+
+// ===== SELEÇÃO EM MASSA =====
+function toggleSelecionadoCobranca(id) {
+  if (selecionadosCobrancas.has(id)) selecionadosCobrancas.delete(id);
+  else selecionadosCobrancas.add(id);
+  atualizarBulkBar('cobrancas');
+  // Atualizar indeterminate do "selecionar todos"
+  const checkAll = document.getElementById('checkTodosCobrancas');
+  if (checkAll) {
+    const checkboxes = document.querySelectorAll('#tabelaBody input[type=checkbox]');
+    checkAll.checked = checkboxes.length > 0 && [...checkboxes].every(cb => cb.checked);
+    checkAll.indeterminate = !checkAll.checked && [...checkboxes].some(cb => cb.checked);
+  }
+}
+
+function toggleSelecionadoCP(id) {
+  if (selecionadosCP.has(id)) selecionadosCP.delete(id);
+  else selecionadosCP.add(id);
+  atualizarBulkBar('contaspagar');
+  const checkAll = document.getElementById('checkTodosCP');
+  if (checkAll) {
+    const checkboxes = document.querySelectorAll('#tabelaCPBody input[type=checkbox]');
+    checkAll.checked = checkboxes.length > 0 && [...checkboxes].every(cb => cb.checked);
+    checkAll.indeterminate = !checkAll.checked && [...checkboxes].some(cb => cb.checked);
+  }
+}
+
+function toggleTodosCobrancas() {
+  const checkboxes = document.querySelectorAll('#tabelaBody input[type=checkbox]');
+  const allChecked = [...checkboxes].every(cb => cb.checked);
+  if (allChecked) {
+    selecionadosCobrancas.clear();
+    checkboxes.forEach(cb => { cb.checked = false; });
+  } else {
+    checkboxes.forEach(cb => { cb.checked = true; selecionadosCobrancas.add(cb.dataset.id); });
+  }
+  atualizarBulkBar('cobrancas');
+}
+
+function toggleTodosCP() {
+  const checkboxes = document.querySelectorAll('#tabelaCPBody input[type=checkbox]');
+  const allChecked = [...checkboxes].every(cb => cb.checked);
+  if (allChecked) {
+    selecionadosCP.clear();
+    checkboxes.forEach(cb => { cb.checked = false; });
+  } else {
+    checkboxes.forEach(cb => { cb.checked = true; selecionadosCP.add(cb.dataset.id); });
+  }
+  atualizarBulkBar('contaspagar');
+}
+
+function atualizarBulkBar(colecao) {
+  const bar = document.getElementById(colecao === 'cobrancas' ? 'bulkBarCobrancas' : 'bulkBarCP');
+  const sel = colecao === 'cobrancas' ? selecionadosCobrancas : selecionadosCP;
+  if (!bar) return;
+  if (sel.size > 0) {
+    bar.style.display = 'flex';
+    const count = bar.querySelector('.bulk-count');
+    if (count) count.textContent = `${sel.size} selecionado${sel.size !== 1 ? 's' : ''}`;
+  } else {
+    bar.style.display = 'none';
+  }
+}
+
+function limparSelecaoCobrancas() {
+  selecionadosCobrancas.clear();
+  renderCobrancas();
+}
+
+function limparSelecaoCP() {
+  selecionadosCP.clear();
+  renderContasPagar();
+}
+
+function excluirSelecionadosCobrancas() {
+  if (selecionadosCobrancas.size === 0) return;
+  if (!confirm(`Excluir ${selecionadosCobrancas.size} cobrança${selecionadosCobrancas.size !== 1 ? 's' : ''}? Esta ação não pode ser desfeita.`)) return;
+  const ids = [...selecionadosCobrancas];
+  state.cobrancas = state.cobrancas.filter(c => !ids.includes(c.id));
+  supabaseClient.from('cobrancas').delete().in('id', ids).then(({ error }) => {
+    if (error) console.error('Erro ao excluir cobranças:', error);
+  });
+  selecionadosCobrancas.clear();
+  renderCobrancas();
+  if (viewAtual === 'dashboard') renderDashboard();
+  toast(`${ids.length} cobrança${ids.length !== 1 ? 's' : ''} excluída${ids.length !== 1 ? 's' : ''}!`);
+}
+
+function excluirSelecionadosCP() {
+  if (selecionadosCP.size === 0) return;
+  if (!confirm(`Excluir ${selecionadosCP.size} conta${selecionadosCP.size !== 1 ? 's' : ''}? Esta ação não pode ser desfeita.`)) return;
+  const ids = [...selecionadosCP];
+  state.contasPagar = state.contasPagar.filter(cp => !ids.includes(cp.id));
+  supabaseClient.from('contas_pagar').delete().in('id', ids).then(({ error }) => {
+    if (error) console.error('Erro ao excluir contas:', error);
+  });
+  selecionadosCP.clear();
+  renderContasPagar();
+  if (viewAtual === 'dashboard') renderDashboard();
+  toast(`${ids.length} conta${ids.length !== 1 ? 's' : ''} excluída${ids.length !== 1 ? 's' : ''}!`);
+}
+
+function abrirEdicaoEmMassaCobrancas() {
+  if (selecionadosCobrancas.size === 0) return;
+  document.getElementById('modalBulkCTitulo').textContent = `Editar ${selecionadosCobrancas.size} lançamento${selecionadosCobrancas.size !== 1 ? 's' : ''}`;
+  // Popular categorias
+  const sel = document.getElementById('bulkCCategoria');
+  sel.innerHTML = '<option value="">— Manter original</option>' +
+    state.categorias.map(cat => `<option value="${cat.nome}">${cat.nome}</option>`).join('');
+  // Limpar campos
+  document.getElementById('bulkCDescricao').value = '';
+  document.getElementById('bulkCValor').value = '';
+  sel.value = '';
+  document.getElementById('bulkCRecorrencia').value = '';
+  document.getElementById('bulkCObservacoes').value = '';
+  document.getElementById('modalBulkCobrancasOverlay').classList.add('open');
+  configurarCamposMoeda();
+}
+
+function fecharBulkCobrancas(event) {
+  if (event && event.target !== document.getElementById('modalBulkCobrancasOverlay')) return;
+  fecharBulkCobrancasForce();
+}
+function fecharBulkCobrancasForce() {
+  document.getElementById('modalBulkCobrancasOverlay').classList.remove('open');
+}
+
+function salvarEdicaoEmMassaCobrancas(event) {
+  event.preventDefault();
+  const descricao = document.getElementById('bulkCDescricao').value.trim();
+  const valorStr = document.getElementById('bulkCValor').value.trim();
+  const valor = valorStr ? parseMoedaBR(valorStr) : null;
+  const categoria = document.getElementById('bulkCCategoria').value;
+  const recorrencia = document.getElementById('bulkCRecorrencia').value;
+  const observacoes = document.getElementById('bulkCObservacoes').value.trim();
+
+  if (!descricao && valor === null && !categoria && !recorrencia && observacoes === '') {
+    toast('Preencha pelo menos um campo para alterar.', 'error');
+    return;
+  }
+
+  const ids = [...selecionadosCobrancas];
+  state.cobrancas.forEach((c, i) => {
+    if (!ids.includes(c.id)) return;
+    const updated = { ...c };
+    if (descricao) updated.descricao = descricao;
+    if (valor !== null) updated.valor = valor;
+    if (categoria) updated.categoria = categoria;
+    if (recorrencia) updated.recorrencia = recorrencia;
+    if (observacoes) updated.observacoes = observacoes;
+    state.cobrancas[i] = updated;
+    supabaseClient.from('cobrancas').update(cobrancaParaDb(updated)).eq('id', c.id).then(({ error }) => {
+      if (error) console.error('Erro ao atualizar cobrança:', error);
+    });
+  });
+
+  fecharBulkCobrancasForce();
+  selecionadosCobrancas.clear();
+  renderCobrancas();
+  if (viewAtual === 'dashboard') renderDashboard();
+  toast(`${ids.length} cobrança${ids.length !== 1 ? 's' : ''} atualizada${ids.length !== 1 ? 's' : ''}!`, 'success');
+}
+
+function abrirEdicaoEmMassaCP() {
+  if (selecionadosCP.size === 0) return;
+  document.getElementById('modalBulkCPTitulo').textContent = `Editar ${selecionadosCP.size} lançamento${selecionadosCP.size !== 1 ? 's' : ''}`;
+  // Limpar campos
+  document.getElementById('bulkCPDescricao').value = '';
+  document.getElementById('bulkCPValor').value = '';
+  document.getElementById('bulkCPTipo').value = '';
+  document.getElementById('bulkCPRecorrencia').value = '';
+  document.getElementById('bulkCPObservacoes').value = '';
+  document.getElementById('modalBulkCPOverlay').classList.add('open');
+  configurarCamposMoeda();
+}
+
+function fecharBulkCP(event) {
+  if (event && event.target !== document.getElementById('modalBulkCPOverlay')) return;
+  fecharBulkCPForce();
+}
+function fecharBulkCPForce() {
+  document.getElementById('modalBulkCPOverlay').classList.remove('open');
+}
+
+function salvarEdicaoEmMassaCP(event) {
+  event.preventDefault();
+  const descricao = document.getElementById('bulkCPDescricao').value.trim();
+  const valorStr = document.getElementById('bulkCPValor').value.trim();
+  const valor = valorStr ? parseMoedaBR(valorStr) : null;
+  const tipo = document.getElementById('bulkCPTipo').value;
+  const recorrencia = document.getElementById('bulkCPRecorrencia').value;
+  const observacoes = document.getElementById('bulkCPObservacoes').value.trim();
+
+  if (!descricao && valor === null && !tipo && !recorrencia && observacoes === '') {
+    toast('Preencha pelo menos um campo para alterar.', 'error');
+    return;
+  }
+
+  const ids = [...selecionadosCP];
+  state.contasPagar.forEach((cp, i) => {
+    if (!ids.includes(cp.id)) return;
+    const updated = { ...cp };
+    if (descricao) updated.descricao = descricao;
+    if (valor !== null) updated.valor = valor;
+    if (tipo) updated.tipo = tipo;
+    if (recorrencia) updated.recorrencia = recorrencia;
+    if (observacoes) updated.observacoes = observacoes;
+    state.contasPagar[i] = updated;
+    supabaseClient.from('contas_pagar').update(contaPagarParaDb(updated)).eq('id', cp.id).then(({ error }) => {
+      if (error) console.error('Erro ao atualizar conta a pagar:', error);
+    });
+  });
+
+  fecharBulkCPForce();
+  selecionadosCP.clear();
+  renderContasPagar();
+  if (viewAtual === 'dashboard') renderDashboard();
+  toast(`${ids.length} conta${ids.length !== 1 ? 's' : ''} atualizada${ids.length !== 1 ? 's' : ''}!`, 'success');
 }
 
 // ===== BAIXA =====
@@ -1795,7 +2048,8 @@ function renderContasPagar() {
   } else {
     empty.style.display = 'none';
     tbody.innerHTML = lista.map(cp => `
-      <tr>
+      <tr class="${selecionadosCP.has(cp.id) ? 'row-selected' : ''}">
+        <td style="padding:0 8px"><input type="checkbox" data-id="${cp.id}" ${selecionadosCP.has(cp.id) ? 'checked' : ''} onchange="toggleSelecionadoCP('${cp.id}')"></td>
         <td>
           <div style="font-weight:600">${cp.descricao}</div>
           ${cp.observacoes ? `<div style="font-size:11px;color:var(--text-muted)">${cp.observacoes}</div>` : ''}
@@ -1830,6 +2084,14 @@ function renderContasPagar() {
         </td>
       </tr>
     `).join('');
+
+    // Atualizar estado do checkbox "selecionar todos"
+    const checkAllCP = document.getElementById('checkTodosCP');
+    if (checkAllCP) {
+      const checkboxes = document.querySelectorAll('#tabelaCPBody input[type=checkbox]');
+      checkAllCP.checked = checkboxes.length > 0 && [...checkboxes].every(cb => cb.checked);
+      checkAllCP.indeterminate = !checkAllCP.checked && [...checkboxes].some(cb => cb.checked);
+    }
   }
 }
 
@@ -1885,21 +2147,39 @@ function salvarContaPagar(event) {
   if (id) {
     const idx = state.contasPagar.findIndex(cp => cp.id === id);
     if (idx !== -1) {
-      state.contasPagar[idx] = { ...state.contasPagar[idx], descricao, tipo, dataVencimento, valor, recorrencia, observacoes };
+      const original = state.contasPagar[idx];
+      state.contasPagar[idx] = { ...original, descricao, tipo, dataVencimento, valor, recorrencia, observacoes };
       atualizarStatusAutoCP();
-      const atualizado = state.contasPagar[idx];
-      supabaseClient.from('contas_pagar').update(contaPagarParaDb(atualizado)).eq('id', id).then(({ error }) => {
+      supabaseClient.from('contas_pagar').update(contaPagarParaDb(state.contasPagar[idx])).eq('id', id).then(({ error }) => {
         if (error) console.error('Erro ao atualizar conta a pagar:', error);
       });
+
+      // Perguntar se quer atualizar demais lançamentos da série
+      const grupoId = original.grupoId;
+      const temSiblings = grupoId && state.contasPagar.some(cp => cp.grupoId === grupoId && cp.id !== id);
+      if (original.recorrencia && original.recorrencia !== 'nenhuma' && temSiblings) {
+        if (confirm('Este lançamento faz parte de uma série recorrente.\nDeseja atualizar os demais lançamentos da série também?\n\n(Datas de vencimento e status de pagamento não serão alterados)')) {
+          state.contasPagar.forEach((cp, i) => {
+            if (cp.grupoId === grupoId && cp.id !== id) {
+              state.contasPagar[i] = { ...cp, descricao, tipo, valor, recorrencia, observacoes };
+              supabaseClient.from('contas_pagar').update(contaPagarParaDb(state.contasPagar[i])).eq('id', cp.id).then(({ error }) => {
+                if (error) console.error('Erro ao atualizar conta recorrente:', error);
+              });
+            }
+          });
+          atualizarStatusAutoCP();
+        }
+      }
     }
     toast('Conta atualizada!', 'success');
   } else {
     const qtd = recorrencia !== 'nenhuma' ? repeticoes : 1;
     let base = new Date(dataVencimento + 'T00:00:00');
     const novasCP = [];
+    const grupoId = recorrencia !== 'nenhuma' ? uid() : null;
     for (let i = 0; i < qtd; i++) {
       const dStr = base.toISOString().slice(0, 10);
-      const novaCP = { id: uid(), descricao, tipo, dataVencimento: dStr, valor, recorrencia, observacoes, status: 'pendente', dataPagamento: null, valorPago: null, criadoEm: new Date().toISOString() };
+      const novaCP = { id: uid(), descricao, tipo, dataVencimento: dStr, valor, recorrencia, observacoes, status: 'pendente', dataPagamento: null, valorPago: null, criadoEm: new Date().toISOString(), grupoId };
       novaCP.status = calcularStatusCP(novaCP);
       state.contasPagar.push(novaCP);
       novasCP.push(novaCP);
