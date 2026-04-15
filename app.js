@@ -1174,7 +1174,8 @@ function salvarCobranca(event) {
         const serieGrupoId = grupoId || id;
         const serie = state.cobrancas.filter(c => c.grupoId === serieGrupoId || c.id === serieGrupoId);
         const ultimaData = serie.reduce((max, c) => c.dataVencimento > max ? c.dataVencimento : max, dataVencimento);
-        let base = proximaData(new Date(ultimaData + 'T00:00:00'), recorrencia);
+        const diaOriginal = new Date(dataVencimento + 'T00:00:00').getDate();
+        let base = proximaData(new Date(ultimaData + 'T00:00:00'), recorrencia, diaOriginal);
         const novas = [];
         for (let i = 0; i < repeticoes; i++) {
           const dStr = base.toISOString().slice(0, 10);
@@ -1187,7 +1188,7 @@ function salvarCobranca(event) {
           nova.status = calcularStatus(nova);
           state.cobrancas.push(nova);
           novas.push(nova);
-          base = proximaData(base, recorrencia);
+          base = proximaData(base, recorrencia, diaOriginal);
         }
         supabaseClient.from('cobrancas').insert(novas.map(c => cobrancaParaDb(c))).then(({ error }) => {
           if (error) console.error('Erro ao inserir novas ocorrências:', error);
@@ -1225,6 +1226,7 @@ function salvarCobranca(event) {
     // Criar (com recorrência)
     const qtd = recorrencia !== 'nenhuma' ? repeticoes : 1;
     let base = new Date(dataVencimento + 'T00:00:00');
+    const diaOriginal = base.getDate(); // preserva o dia escolhido (ex: 30) para todos os meses
     const novasCobrancas = [];
     const grupoId = recorrencia !== 'nenhuma' ? uid() : null;
 
@@ -1251,8 +1253,8 @@ function salvarCobranca(event) {
       state.cobrancas.push(novaC);
       novasCobrancas.push(novaC);
 
-      // Avançar data conforme recorrência
-      base = proximaData(base, recorrencia);
+      // Avançar data preservando o dia original
+      base = proximaData(base, recorrencia, diaOriginal);
     }
     supabaseClient.from('cobrancas').insert(novasCobrancas.map(c => cobrancaParaDb(c))).then(({ error }) => {
       if (error) console.error('Erro ao inserir cobranças:', error);
@@ -1266,15 +1268,17 @@ function salvarCobranca(event) {
   else if (viewAtual === 'cobrancas') renderCobrancas();
 }
 
-function proximaData(base, rec) {
+// diaOriginal: dia pretendido pelo usuário (ex: 30) — passado em todas as iterações
+// para que meses curtos (fev) não "contaminem" os meses seguintes
+function proximaData(base, rec, diaOriginal) {
   const d = new Date(base);
-  const diaOriginal = d.getDate();
+  const dia = diaOriginal || d.getDate();
 
   function avancaMeses(n) {
     d.setDate(1); // evita overflow ao mudar o mês
     d.setMonth(d.getMonth() + n);
     const ultimoDia = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
-    d.setDate(Math.min(diaOriginal, ultimoDia));
+    d.setDate(Math.min(dia, ultimoDia));
   }
 
   switch (rec) {
@@ -2280,7 +2284,8 @@ function salvarContaPagar(event) {
         const serieGrupoId = grupoId || id;
         const serie = state.contasPagar.filter(cp => cp.grupoId === serieGrupoId || cp.id === serieGrupoId);
         const ultimaData = serie.reduce((max, cp) => cp.dataVencimento > max ? cp.dataVencimento : max, dataVencimento);
-        let base = proximaData(new Date(ultimaData + 'T00:00:00'), recorrencia);
+        const diaOriginal = new Date(dataVencimento + 'T00:00:00').getDate();
+        let base = proximaData(new Date(ultimaData + 'T00:00:00'), recorrencia, diaOriginal);
         const novas = [];
         for (let i = 0; i < repeticoes; i++) {
           const dStr = base.toISOString().slice(0, 10);
@@ -2292,7 +2297,7 @@ function salvarContaPagar(event) {
           nova.status = calcularStatusCP(nova);
           state.contasPagar.push(nova);
           novas.push(nova);
-          base = proximaData(base, recorrencia);
+          base = proximaData(base, recorrencia, diaOriginal);
         }
         supabaseClient.from('contas_pagar').insert(novas.map(cp => contaPagarParaDb(cp))).then(({ error }) => {
           if (error) console.error('Erro ao inserir novas ocorrências:', error);
@@ -2329,6 +2334,7 @@ function salvarContaPagar(event) {
   } else {
     const qtd = recorrencia !== 'nenhuma' ? repeticoes : 1;
     let base = new Date(dataVencimento + 'T00:00:00');
+    const diaOriginal = base.getDate();
     const novasCP = [];
     const grupoId = recorrencia !== 'nenhuma' ? uid() : null;
     for (let i = 0; i < qtd; i++) {
@@ -2337,7 +2343,7 @@ function salvarContaPagar(event) {
       novaCP.status = calcularStatusCP(novaCP);
       state.contasPagar.push(novaCP);
       novasCP.push(novaCP);
-      base = proximaData(base, recorrencia);
+      base = proximaData(base, recorrencia, diaOriginal);
     }
     supabaseClient.from('contas_pagar').insert(novasCP.map(cp => contaPagarParaDb(cp))).then(({ error }) => {
       if (error) console.error('Erro ao inserir contas a pagar:', error);
