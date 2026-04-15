@@ -690,10 +690,10 @@ function atualizarAcaoTopo(view) {
 
   const botoesPorView = {
     dashboard: [
-      { label: 'Nova Cobrança', action: "abrirModalCobranca()" },
-      { label: 'Nova Conta a Pagar', action: "abrirModalContaPagar()" },
-      { label: 'Nova Despesa', action: "abrirModalDespesa()" },
       { label: 'Novo Cliente', action: "abrirModalCliente()" },
+      { label: 'Nova Cobrança', action: "abrirModalCobranca()" },
+      { label: 'Nova Despesa', action: "abrirModalDespesa()" },
+      { label: 'Nova Conta a Pagar', action: "abrirModalContaPagar()" },
       { label: 'Emitir Relatórios', action: "navegarPara('relatorios')" },
     ],
     cobrancas: [
