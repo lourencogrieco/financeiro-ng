@@ -1,4 +1,4 @@
-/* ===== Financeiro NG — app.js ===== */
+/* ===== Fluxo 360 — app.js ===== */
 
 const supabaseUrl ="https://gcucadlnxttlxckravui.supabase.co"
 const supabaseKey = "sb_publishable_5i0somnwIAvyLNImLSWYxg_yogC3bCb"
@@ -126,6 +126,21 @@ let state = {
     { nome: 'Diligências',           cor: '#06b6d4' },
     { nome: 'Impostos',              cor: '#ef4444' },
     { nome: 'Outros',                cor: '#6b7280' },
+  ],
+  categoriasDespesas: [
+    { nome: 'Custas Processuais', cor: '#3b82f6' },
+    { nome: 'Diligências',        cor: '#06b6d4' },
+    { nome: 'Honorários',         cor: '#6366f1' },
+    { nome: 'Impostos',           cor: '#ef4444' },
+    { nome: 'Outros',             cor: '#6b7280' },
+  ],
+  categoriasCP: [
+    { nome: 'Prestadores de Serviço', cor: '#8b5cf6' },
+    { nome: 'Tributos / Impostos',    cor: '#ef4444' },
+    { nome: 'Notas Fiscais',          cor: '#3b82f6' },
+    { nome: 'Folha de Pagamento',     cor: '#f59e0b' },
+    { nome: 'Aluguel / Locações',     cor: '#6366f1' },
+    { nome: 'Outros',                 cor: '#6b7280' },
   ],
   clientes: [],
   despesas: [],
@@ -333,6 +348,7 @@ function despesaParaDb(d) {
     cliente_id: d.clienteId || null,
     cliente_nome: d.clienteNome || null,
     descricao: d.descricao, data: d.data, valor: d.valor,
+    categoria: d.categoria || null,
     observacoes: d.observacoes || null, status: d.status,
     criado_em: d.criadoEm || new Date().toISOString(),
   };
@@ -340,7 +356,7 @@ function despesaParaDb(d) {
 function dbParaDespesa(row) {
   return {
     id: row.id, clienteId: row.cliente_id, clienteNome: row.cliente_nome || null,
-    descricao: row.descricao,
+    descricao: row.descricao, categoria: row.categoria || null,
     data: row.data, valor: Number(row.valor), observacoes: row.observacoes,
     status: row.status, criadoEm: row.criado_em,
   };
@@ -397,6 +413,8 @@ async function carregarDadosSupabase() {
 
   if (resConfig.data) {
     state.categorias = resConfig.data.categorias || state.categorias;
+    state.categoriasDespesas = resConfig.data.categorias_despesas || state.categoriasDespesas;
+    state.categoriasCP = resConfig.data.categorias_cp || state.categoriasCP;
     state.config = { ...state.config, ...(resConfig.data.config || {}) };
     state.contadores = { ...state.contadores, ...(resConfig.data.contadores || {}) };
   }
@@ -409,6 +427,8 @@ async function salvarConfigSupabase() {
     empresa_id: state.empresaId,
     user_id: state.meuPerfil?.userId,
     categorias: state.categorias,
+    categorias_despesas: state.categoriasDespesas,
+    categorias_cp: state.categoriasCP,
     config: state.config,
     contadores: state.contadores,
   }]);
@@ -1355,7 +1375,7 @@ function renderRelatorios() {
     if (!custosMap[chave]) custosMap[chave] = { qtd: 0, aberto: 0, pago: 0, total: 0 };
     custosMap[chave].qtd++;
     custosMap[chave].total += d.valor;
-    if (d.status === 'faturado') custosMap[chave].pago += d.valor;
+    if (d.status === 'pago') custosMap[chave].pago += d.valor;
     else custosMap[chave].aberto += d.valor;
   });
 
@@ -1404,48 +1424,94 @@ function renderRelatorios() {
 // ===== CONFIGURAÇÕES =====
 function renderConfiguracoes() {
   document.getElementById('diasAlerta').value = state.config.diasAlerta || 7;
-  renderCategorias();
+  renderCategoriasSection('cobrancas');
+  renderCategoriasSection('despesas');
+  renderCategoriasSection('cp');
+  popularCategoriasDespesasForm();
+  popularCategoriasCP();
   renderEquipe();
   document.getElementById('conviteGerado').style.display = 'none';
 }
 
-function renderCategorias() {
-  const el = document.getElementById('listaCategorias');
-  if (state.categorias.length === 0) {
+function getCategoriasArray(tipo) {
+  if (tipo === 'despesas') return state.categoriasDespesas;
+  if (tipo === 'cp') return state.categoriasCP;
+  return state.categorias;
+}
+
+function renderCategoriasSection(tipo) {
+  const ids = {
+    cobrancas: 'listaCategorias',
+    despesas:  'listaCategoriasDespesas',
+    cp:        'listaCategoriasCP',
+  };
+  const el = document.getElementById(ids[tipo]);
+  if (!el) return;
+  const arr = getCategoriasArray(tipo);
+  if (arr.length === 0) {
     el.innerHTML = '<span style="color:var(--text-muted);font-size:13px">Nenhuma categoria</span>';
     return;
   }
-  el.innerHTML = state.categorias.map((c, i) => `
+  el.innerHTML = arr.map((c, i) => `
     <span class="tag" style="background:${c.cor}">
       ${c.nome}
-      <button class="tag-remove" onclick="removerCategoria(${i})" title="Remover">×</button>
+      <button class="tag-remove" onclick="removerCategoriaSection('${tipo}',${i})" title="Remover">×</button>
     </span>
   `).join('');
 }
 
-function adicionarCategoria() {
-  const nome = document.getElementById('novaCategoria').value.trim();
-  const cor = document.getElementById('corCategoria').value;
+function adicionarCategoriaSection(tipo) {
+  const ids = { cobrancas: ['novaCategoria','corCategoria'], despesas: ['novaCategoriaDesp','corCategoriaDesp'], cp: ['novaCategoriaCP','corCategoriaCP'] };
+  const [inputId, corId] = ids[tipo];
+  const nome = document.getElementById(inputId).value.trim();
+  const cor = document.getElementById(corId).value;
   if (!nome) return;
-  if (state.categorias.find(c => c.nome.toLowerCase() === nome.toLowerCase())) {
-    toast('Categoria já existe', 'error');
-    return;
-  }
-  state.categorias.push({ nome, cor });
+  const arr = getCategoriasArray(tipo);
+  if (arr.find(c => c.nome.toLowerCase() === nome.toLowerCase())) { toast('Categoria já existe', 'error'); return; }
+  arr.push({ nome, cor });
   salvarConfigSupabase();
-  renderCategorias();
-  popularCategoriasForms();
-  document.getElementById('novaCategoria').value = '';
+  renderCategoriasSection(tipo);
+  if (tipo === 'cobrancas') popularCategoriasForms();
+  if (tipo === 'despesas') popularCategoriasDespesasForm();
+  if (tipo === 'cp') popularCategoriasCP();
+  document.getElementById(inputId).value = '';
   toast('Categoria adicionada!', 'success');
 }
 
-function removerCategoria(idx) {
-  const cat = state.categorias[idx];
-  if (!confirm(`Remover categoria "${cat.nome}"?`)) return;
-  state.categorias.splice(idx, 1);
+function removerCategoriaSection(tipo, idx) {
+  const arr = getCategoriasArray(tipo);
+  const cat = arr[idx];
+  if (!confirm(`Remover "${cat.nome}"?`)) return;
+  arr.splice(idx, 1);
   salvarConfigSupabase();
-  renderCategorias();
+  renderCategoriasSection(tipo);
+  if (tipo === 'cobrancas') popularCategoriasForms();
+  if (tipo === 'despesas') popularCategoriasDespesasForm();
+  if (tipo === 'cp') popularCategoriasCP();
   toast('Categoria removida');
+}
+
+// Manter compatibilidade com chamadas antigas de cobranças
+function renderCategorias() { renderCategoriasSection('cobrancas'); }
+function adicionarCategoria() { adicionarCategoriaSection('cobrancas'); }
+function removerCategoria(idx) { removerCategoriaSection('cobrancas', idx); }
+
+function popularCategoriasDespesasForm() {
+  const sel = document.getElementById('dCategoria');
+  if (sel) {
+    sel.innerHTML = '<option value="">Sem categoria</option>' +
+      state.categoriasDespesas.map(c => `<option value="${c.nome}">${c.nome}</option>`).join('');
+  }
+}
+
+function popularCategoriasCP() {
+  const sel = document.getElementById('cpTipo');
+  if (sel) {
+    const val = sel.value;
+    sel.innerHTML = '<option value="">Selecione...</option>' +
+      state.categoriasCP.map(c => `<option value="${c.nome}">${c.nome}</option>`).join('');
+    sel.value = val;
+  }
 }
 
 function salvarConfig() {
@@ -1462,6 +1528,8 @@ function popularCategoriasForms() {
     sel.innerHTML = '<option value="">Sem categoria</option>' +
       state.categorias.map(c => `<option value="${c.nome}">${c.nome}</option>`).join('');
   }
+  popularCategoriasDespesasForm();
+  popularCategoriasCP();
 }
 
 // ===== EXPORT / IMPORT =====
@@ -1723,6 +1791,7 @@ function abrirModalContaPagar(id) {
   document.getElementById('editCPId').value = '';
   document.getElementById('modalCPTitulo').textContent = 'Nova Conta a Pagar';
   document.getElementById('cpVencimento').value = hoje();
+  popularCategoriasCP();
   document.getElementById('cpRecorrencia').addEventListener('change', toggleRepetirCP);
   toggleRepetirCP();
   if (id) {
@@ -2107,11 +2176,11 @@ function renderDespesas() {
   atualizarIndicadoresOrdenacao('despesas', ['cliente', 'descricao', 'data', 'valor', 'status']);
 
   const totalPend = lista.filter(d => d.status === 'pendente').reduce((s, d) => s + d.valor, 0);
-  const totalFat = lista.filter(d => d.status === 'faturado').reduce((s, d) => s + d.valor, 0);
+  const totalPago = lista.filter(d => d.status === 'pago').reduce((s, d) => s + d.valor, 0);
   document.getElementById('despesas-summary').innerHTML = `
     <span>${lista.length} registro${lista.length !== 1 ? 's' : ''}</span>
     <span>Pendente: <strong>${fmt(totalPend)}</strong></span>
-    <span>Faturado: <strong>${fmt(totalFat)}</strong></span>
+    <span>Pago: <strong>${fmt(totalPago)}</strong></span>
   `;
 
   const tbody = document.getElementById('tabelaDespesasBody');
@@ -2135,11 +2204,11 @@ function renderDespesas() {
         </td>
         <td style="white-space:nowrap">${fmtData(d.data)}</td>
         <td style="font-weight:700;white-space:nowrap">${fmt(d.valor)}</td>
-        <td><span class="badge ${d.status === 'pendente' ? 'badge-pendente' : 'badge-pago'}">${d.status === 'faturado' ? 'Faturado' : 'Pendente'}</span></td>
+        <td><span class="badge ${d.status === 'pendente' ? 'badge-pendente' : 'badge-pago'}">${d.status === 'pago' ? 'Pago' : 'Pendente'}</span></td>
         <td>
           <div class="actions">
             ${d.status === 'pendente'
-              ? `<button class="btn-icon success" title="Marcar como faturado" onclick="marcarDespesaFaturada('${d.id}')">
+              ? `<button class="btn-icon success" title="Marcar como pago" onclick="marcarDespesaPaga('${d.id}')">
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
                  </button>`
               : `<button class="btn-icon success" title="Gerar Recibo" onclick="gerarReciboDespesa('${d.id}')">
@@ -2163,6 +2232,7 @@ function abrirModalDespesa(id, preClienteId) {
   document.getElementById('editDespesaId').value = '';
   document.getElementById('modalDespesaTitulo').textContent = 'Nova Despesa';
   document.getElementById('dData').value = hoje();
+  popularCategoriasDespesasForm();
   // Pre-select client by ID
   if (preClienteId) {
     const c = state.clientes.find(x => x.id === preClienteId);
@@ -2173,12 +2243,12 @@ function abrirModalDespesa(id, preClienteId) {
     if (!d) return;
     document.getElementById('editDespesaId').value = d.id;
     document.getElementById('modalDespesaTitulo').textContent = 'Editar Despesa';
-    // Resolve client name from ID or stored name
     const clienteNomeDisplay = d.clienteId ? (nomeClienteTexto(d.clienteId) || d.clienteNome || '') : (d.clienteNome || '');
     document.getElementById('dCliente').value = clienteNomeDisplay;
     document.getElementById('dDescricao').value = d.descricao;
     document.getElementById('dData').value = d.data;
     document.getElementById('dValor').value = fmtNumeroBR(d.valor);
+    if (document.getElementById('dCategoria')) document.getElementById('dCategoria').value = d.categoria || '';
     document.getElementById('dObservacoes').value = d.observacoes || '';
   }
   document.getElementById('modalDespesaOverlay').classList.add('open');
@@ -2203,6 +2273,7 @@ function salvarDespesa(event) {
     descricao: document.getElementById('dDescricao').value.trim(),
     data: document.getElementById('dData').value,
     valor: parseMoedaBR(document.getElementById('dValor').value),
+    categoria: document.getElementById('dCategoria')?.value || null,
     observacoes: document.getElementById('dObservacoes').value.trim(),
   };
   if (id) {
@@ -2237,15 +2308,15 @@ function excluirDespesa(id) {
   toast('Despesa excluída');
 }
 
-function marcarDespesaFaturada(id) {
+function marcarDespesaPaga(id) {
   const idx = state.despesas.findIndex(d => d.id === id);
   if (idx === -1) return;
-  state.despesas[idx].status = 'faturado';
+  state.despesas[idx].status = 'pago';
   supabaseClient.from('despesas').update(despesaParaDb(state.despesas[idx])).eq('id', id).then(({ error }) => {
-    if (error) console.error('Erro ao marcar despesa como faturada:', error);
+    if (error) console.error('Erro ao marcar despesa como paga:', error);
   });
   renderDespesas();
-  toast('Despesa marcada como faturada', 'success');
+  toast('Despesa marcada como paga', 'success');
 }
 
 // ===== NOTA DE DÉBITO =====
@@ -2287,7 +2358,7 @@ function gerarNotaDebito(clienteId) {
         <div class="doc-logo">
           <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="2.5"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
           <div>
-            <div class="doc-office">Financeiro NG</div>
+            <div class="doc-office">Fluxo 360</div>
             <div class="doc-office-sub">Escritório de Advocacia</div>
           </div>
         </div>
@@ -2343,9 +2414,9 @@ function gerarNotaDebito(clienteId) {
   despesas.forEach(d => {
     const idx = state.despesas.findIndex(x => x.id === d.id);
     if (idx !== -1) {
-      state.despesas[idx].status = 'faturado';
+      state.despesas[idx].status = 'pago';
       supabaseClient.from('despesas').update(despesaParaDb(state.despesas[idx])).eq('id', d.id).then(({ error }) => {
-        if (error) console.error('Erro ao marcar despesa como faturada:', error);
+        if (error) console.error('Erro ao marcar despesa como paga:', error);
       });
     }
   });
@@ -2370,7 +2441,7 @@ function gerarRecibo(cobrancaId) {
         <div class="doc-logo">
           <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="2.5"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
           <div>
-            <div class="doc-office">Financeiro NG</div>
+            <div class="doc-office">Fluxo 360</div>
             <div class="doc-office-sub">Escritório de Advocacia</div>
           </div>
         </div>
@@ -2422,7 +2493,7 @@ function gerarRecibo(cobrancaId) {
 // ===== RECIBO DE DESPESA =====
 function gerarReciboDespesa(despesaId) {
   const d = state.despesas.find(x => x.id === despesaId);
-  if (!d || d.status !== 'faturado') return;
+  if (!d || d.status !== 'pago') return;
 
   state.contadores.recibo = (state.contadores.recibo || 0) + 1;
   salvarConfigSupabase();
@@ -2436,7 +2507,7 @@ function gerarReciboDespesa(despesaId) {
         <div class="doc-logo">
           <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="2.5"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
           <div>
-            <div class="doc-office">${state.empresaNome || 'Financeiro NG'}</div>
+            <div class="doc-office">${state.empresaNome || 'Fluxo 360'}</div>
             <div class="doc-office-sub">Recibo de Despesa</div>
           </div>
         </div>
@@ -2577,7 +2648,7 @@ async function gerarConviteUsuarios() {
 
   const emailConvidado = document.getElementById('conviteEmailUsuario')?.value.trim() || '';
   const mailtoLink = emailConvidado
-    ? `mailto:${emailConvidado}?subject=Convite%20Financeiro%20NG&body=Voc%C3%AA%20foi%20convidado%20para%20a%20empresa%20${encodeURIComponent(state.empresaNome || 'Financeiro NG')}%20no%20Financeiro%20NG.%0A%0ACrie%20uma%20conta%20em%20${encodeURIComponent(window.location.origin)}%20e%20use%20o%20c%C3%B3digo%3A%20${convite.codigo}`
+    ? `mailto:${emailConvidado}?subject=Convite%20Fluxo%20360&body=Voc%C3%AA%20foi%20convidado%20para%20a%20empresa%20${encodeURIComponent(state.empresaNome || 'Fluxo 360')}%20no%20Fluxo%20360.%0A%0ACrie%20uma%20conta%20em%20${encodeURIComponent(window.location.origin)}%20e%20use%20o%20c%C3%B3digo%3A%20${convite.codigo}`
     : '';
 
   const box = document.getElementById('conviteGeradoUsuarios');

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Financeiro NG</title>
+  <title>Fluxo 360</title>
   <link rel="stylesheet" href="style.css" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
@@ -14,7 +14,7 @@
   <div class="setup-box">
     <div class="setup-logo">
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="2.5"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
-      <span>Financeiro NG</span>
+      <span>Fluxo 360</span>
     </div>
     <h2>Configure sua empresa</h2>
     <p class="setup-sub">Crie um novo perfil de empresa ou entre com um código de convite de um colega.</p>
@@ -62,7 +62,7 @@
 
 <div id="loginScreen" class="login-screen">
   <div class="login-box">
-    <h2>Financeiro NG</h2>
+    <h2>Fluxo 360</h2>
 
     <input type="email" id="loginEmail" placeholder="Seu email">
     <input type="password" id="loginSenha" placeholder="Sua senha">
@@ -90,7 +90,7 @@
     <div class="sidebar-logo">
       <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="2.5"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
       <div class="sidebar-logo-text">
-        <div class="sidebar-app-name">Financeiro NG</div>
+        <div class="sidebar-app-name">Fluxo 360</div>
         <div class="sidebar-empresa-name" id="sidebarEmpresaName"></div>
       </div>
     </div>
@@ -375,12 +375,32 @@
   <!-- Configurações -->
   <div class="view" id="view-configuracoes">
     <section class="section" style="max-width:560px">
-      <div class="section-header"><h2>Categorias</h2></div>
+      <div class="section-header"><h2>Categorias de Cobranças</h2></div>
       <div id="listaCategorias" class="tags-list"></div>
       <div class="input-row" style="margin-top:16px">
         <input type="text" class="input" id="novaCategoria" placeholder="Nova categoria..." maxlength="40">
-        <input type="color" id="corCategoria" value="#6366f1" class="input-color" title="Cor da categoria">
-        <button class="btn btn-primary" onclick="adicionarCategoria()">Adicionar</button>
+        <input type="color" id="corCategoria" value="#6366f1" class="input-color" title="Cor">
+        <button class="btn btn-primary" onclick="adicionarCategoriaSection('cobrancas')">Adicionar</button>
+      </div>
+    </section>
+
+    <section class="section" style="max-width:560px; margin-top:20px">
+      <div class="section-header"><h2>Categorias de Despesas</h2></div>
+      <div id="listaCategoriasDespesas" class="tags-list"></div>
+      <div class="input-row" style="margin-top:16px">
+        <input type="text" class="input" id="novaCategoriaDesp" placeholder="Nova categoria..." maxlength="40">
+        <input type="color" id="corCategoriaDesp" value="#3b82f6" class="input-color" title="Cor">
+        <button class="btn btn-primary" onclick="adicionarCategoriaSection('despesas')">Adicionar</button>
+      </div>
+    </section>
+
+    <section class="section" style="max-width:560px; margin-top:20px">
+      <div class="section-header"><h2>Tipos de Contas a Pagar</h2></div>
+      <div id="listaCategoriasCP" class="tags-list"></div>
+      <div class="input-row" style="margin-top:16px">
+        <input type="text" class="input" id="novaCategoriaCP" placeholder="Novo tipo..." maxlength="40">
+        <input type="color" id="corCategoriaCP" value="#8b5cf6" class="input-color" title="Cor">
+        <button class="btn btn-primary" onclick="adicionarCategoriaSection('cp')">Adicionar</button>
       </div>
     </section>
 
@@ -522,7 +542,7 @@
         <select class="select-filter" id="filterStatusDespesa" onchange="renderDespesas()">
           <option value="">Todos os status</option>
           <option value="pendente">Pendente</option>
-          <option value="faturado">Faturado</option>
+          <option value="pago">Pago</option>
         </select>
         <select class="select-filter" id="filterMesDespesa" onchange="renderDespesas()">
           <option value="">Todos os meses</option>
