@@ -676,7 +676,7 @@ function navegarPara(view) {
   document.getElementById('view-' + view)?.classList.add('active');
   document.querySelector(`[data-view="${view}"]`)?.classList.add('active');
 
-  const titulos = { dashboard: 'Dashboard', cobrancas: 'Cobranças', relatorios: 'Relatórios', configuracoes: 'Configurações', clientes: 'Clientes', despesas: 'Despesas', contaspagar: 'Contas a Pagar', usuarios: 'Usuários' };
+  const titulos = { dashboard: 'Dashboard', cobrancas: 'Cobranças', relatorios: 'Relatórios', configuracoes: 'Configurações', clientes: 'Clientes', despesas: 'Despesas Reembolsáveis', contaspagar: 'Contas a Pagar', usuarios: 'Usuários' };
   document.getElementById('pageTitle').textContent = titulos[view] || '';
   atualizarAcaoTopo(view);
 
@@ -698,7 +698,7 @@ function atualizarAcaoTopo(view) {
     dashboard: [
       { label: 'Novo Cliente', action: "abrirModalCliente()" },
       { label: 'Nova Cobrança', action: "abrirModalCobranca()" },
-      { label: 'Nova Despesa', action: "abrirModalDespesa()" },
+      { label: 'Nova Despesa Reembolsável', action: "abrirModalDespesa()" },
       { label: 'Nova Conta a Pagar', action: "abrirModalContaPagar()" },
       { label: 'Emitir Relatórios', action: "navegarPara('relatorios')" },
     ],
@@ -709,7 +709,7 @@ function atualizarAcaoTopo(view) {
       { label: 'Nova Conta a Pagar', action: "abrirModalContaPagar()" },
     ],
     despesas: [
-      { label: 'Nova Despesa', action: "abrirModalDespesa()" },
+      { label: 'Nova Despesa Reembolsável', action: "abrirModalDespesa()" },
     ],
     relatorios: [
       { label: 'Imprimir Relatório', action: "imprimirRelatorio()" },
@@ -1093,8 +1093,28 @@ function toggleRepetir() {
   const rec = document.getElementById('fRecorrencia').value;
   const editId = document.getElementById('editId').value;
   const grupoRepetir = document.getElementById('grupoRepetir');
-  // Mostrar só em modo novo (sem id) e quando há recorrência
-  grupoRepetir.style.display = (rec !== 'nenhuma' && !editId) ? 'flex' : 'none';
+  if (rec === 'nenhuma') {
+    grupoRepetir.style.display = 'none';
+    document.getElementById('grupoRemover').style.display = 'none';
+    return;
+  }
+  grupoRepetir.style.display = 'flex';
+  if (editId) {
+    document.getElementById('labelRepeticoes').textContent = 'Adicionar mais ocorrências';
+    document.getElementById('spanRepeticoesHint').textContent = 'a partir da última data (0 = nenhuma)';
+    document.getElementById('fRepeticoes').value = 0;
+    document.getElementById('fRepeticoes').min = 0;
+    document.getElementById('grupoRemover').style.display = 'flex';
+    document.getElementById('fRemover').value = 0;
+  } else {
+    document.getElementById('labelRepeticoes').textContent = 'Repetir por';
+    document.getElementById('spanRepeticoesHint').textContent = 'ocorrências';
+    document.getElementById('fRepeticoes').min = 1;
+    document.getElementById('grupoRemover').style.display = 'none';
+    if (!document.getElementById('fRepeticoes').value || document.getElementById('fRepeticoes').value === '0') {
+      document.getElementById('fRepeticoes').value = 12;
+    }
+  }
 }
 
 function fecharModal(event) {
@@ -1111,13 +1131,14 @@ function salvarCobranca(event) {
   const clienteInformado = document.getElementById('fCliente').value.trim();
   const clienteExistente = state.clientes.find(c => c.nome.toLowerCase() === clienteInformado.toLowerCase());
   const clienteId = clienteExistente ? clienteExistente.id : '';
-  const clienteNome = clienteId ? clienteExistente.nome : clienteInformado;
+  const clienteNome = (clienteId ? clienteExistente.nome : clienteInformado).toUpperCase();
   const descricao = document.getElementById('fDescricao').value.trim();
   const valor = parseMoedaBR(document.getElementById('fValor').value);
   const dataVencimento = document.getElementById('fVencimento').value;
   const categoria = document.getElementById('fCategoria').value;
   const recorrencia = document.getElementById('fRecorrencia').value;
-  const repeticoes = parseInt(document.getElementById('fRepeticoes').value) || 1;
+  const repeticoes = parseInt(document.getElementById('fRepeticoes').value) || 0;
+  const remover = parseInt(document.getElementById('fRemover').value) || 0;
   const observacoes = document.getElementById('fObservacoes').value.trim();
 
   if (id) {
@@ -1145,6 +1166,57 @@ function salvarCobranca(event) {
             }
           });
           atualizarStatusAuto();
+        }
+      }
+
+      // Adicionar novas ocorrências se solicitado
+      if (recorrencia !== 'nenhuma' && repeticoes > 0) {
+        const serieGrupoId = grupoId || id;
+        const serie = state.cobrancas.filter(c => c.grupoId === serieGrupoId || c.id === serieGrupoId);
+        const ultimaData = serie.reduce((max, c) => c.dataVencimento > max ? c.dataVencimento : max, dataVencimento);
+        let base = proximaData(new Date(ultimaData + 'T00:00:00'), recorrencia);
+        const novas = [];
+        for (let i = 0; i < repeticoes; i++) {
+          const dStr = base.toISOString().slice(0, 10);
+          const nova = {
+            id: uid(), clienteId, clienteNome, descricao, valor, dataVencimento: dStr,
+            categoria, recorrencia, observacoes, status: 'pendente',
+            dataPagamento: null, valorPago: null,
+            criadoEm: new Date().toISOString(), grupoId: serieGrupoId,
+          };
+          nova.status = calcularStatus(nova);
+          state.cobrancas.push(nova);
+          novas.push(nova);
+          base = proximaData(base, recorrencia);
+        }
+        supabaseClient.from('cobrancas').insert(novas.map(c => cobrancaParaDb(c))).then(({ error }) => {
+          if (error) console.error('Erro ao inserir novas ocorrências:', error);
+        });
+        toast(`Cobrança atualizada + ${repeticoes} ocorrência${repeticoes !== 1 ? 's' : ''} adicionada${repeticoes !== 1 ? 's' : ''}!`, 'success');
+        fecharModalForce();
+        if (viewAtual === 'dashboard') renderDashboard();
+        else if (viewAtual === 'cobrancas') renderCobrancas();
+        return;
+      }
+
+      // Remover ocorrências futuras não pagas se solicitado
+      if (recorrencia !== 'nenhuma' && remover > 0) {
+        const serieGrupoId = grupoId || id;
+        const futuras = state.cobrancas
+          .filter(c => (c.grupoId === serieGrupoId || c.id === serieGrupoId) && c.id !== id && c.status !== 'pago')
+          .sort((a, b) => b.dataVencimento.localeCompare(a.dataVencimento)); // mais futuras primeiro
+        const aRemover = futuras.slice(0, remover);
+        if (aRemover.length > 0) {
+          const idsRemover = aRemover.map(c => c.id);
+          state.cobrancas = state.cobrancas.filter(c => !idsRemover.includes(c.id));
+          supabaseClient.from('cobrancas').delete().in('id', idsRemover).then(({ error }) => {
+            if (error) console.error('Erro ao remover ocorrências:', error);
+          });
+          toast(`Cobrança atualizada — ${aRemover.length} ocorrência${aRemover.length !== 1 ? 's' : ''} removida${aRemover.length !== 1 ? 's' : ''}!`, 'success');
+          fecharModalForce();
+          if (viewAtual === 'dashboard') renderDashboard();
+          else if (viewAtual === 'cobrancas') renderCobrancas();
+          return;
         }
       }
     }
@@ -2122,7 +2194,29 @@ function abrirModalContaPagar(id) {
 function toggleRepetirCP() {
   const rec = document.getElementById('cpRecorrencia').value;
   const editId = document.getElementById('editCPId').value;
-  document.getElementById('grupoRepetirCP').style.display = (rec !== 'nenhuma' && !editId) ? 'flex' : 'none';
+  const grupo = document.getElementById('grupoRepetirCP');
+  if (rec === 'nenhuma') {
+    grupo.style.display = 'none';
+    document.getElementById('grupoRemoverCP').style.display = 'none';
+    return;
+  }
+  grupo.style.display = 'flex';
+  if (editId) {
+    document.getElementById('labelRepeticoesCP').textContent = 'Adicionar mais ocorrências';
+    document.getElementById('spanRepeticoesCPHint').textContent = 'a partir da última data (0 = nenhuma)';
+    document.getElementById('cpRepeticoes').value = 0;
+    document.getElementById('cpRepeticoes').min = 0;
+    document.getElementById('grupoRemoverCP').style.display = 'flex';
+    document.getElementById('cpRemover').value = 0;
+  } else {
+    document.getElementById('labelRepeticoesCP').textContent = 'Repetir por';
+    document.getElementById('spanRepeticoesCPHint').textContent = 'ocorrências';
+    document.getElementById('cpRepeticoes').min = 1;
+    document.getElementById('grupoRemoverCP').style.display = 'none';
+    if (!document.getElementById('cpRepeticoes').value || document.getElementById('cpRepeticoes').value === '0') {
+      document.getElementById('cpRepeticoes').value = 12;
+    }
+  }
 }
 
 function fecharModalContaPagar(event) {
@@ -2141,7 +2235,8 @@ function salvarContaPagar(event) {
   const dataVencimento = document.getElementById('cpVencimento').value;
   const valor = parseMoedaBR(document.getElementById('cpValor').value);
   const recorrencia = document.getElementById('cpRecorrencia').value;
-  const repeticoes = parseInt(document.getElementById('cpRepeticoes').value) || 1;
+  const repeticoes = parseInt(document.getElementById('cpRepeticoes').value) || 0;
+  const removerCP = parseInt(document.getElementById('cpRemover').value) || 0;
   const observacoes = document.getElementById('cpObservacoes').value.trim();
 
   if (id) {
@@ -2168,6 +2263,56 @@ function salvarContaPagar(event) {
             }
           });
           atualizarStatusAutoCP();
+        }
+      }
+
+      // Adicionar novas ocorrências se solicitado
+      if (recorrencia !== 'nenhuma' && repeticoes > 0) {
+        const serieGrupoId = grupoId || id;
+        const serie = state.contasPagar.filter(cp => cp.grupoId === serieGrupoId || cp.id === serieGrupoId);
+        const ultimaData = serie.reduce((max, cp) => cp.dataVencimento > max ? cp.dataVencimento : max, dataVencimento);
+        let base = proximaData(new Date(ultimaData + 'T00:00:00'), recorrencia);
+        const novas = [];
+        for (let i = 0; i < repeticoes; i++) {
+          const dStr = base.toISOString().slice(0, 10);
+          const nova = {
+            id: uid(), descricao, tipo, dataVencimento: dStr, valor, recorrencia, observacoes,
+            status: 'pendente', dataPagamento: null, valorPago: null,
+            criadoEm: new Date().toISOString(), grupoId: serieGrupoId,
+          };
+          nova.status = calcularStatusCP(nova);
+          state.contasPagar.push(nova);
+          novas.push(nova);
+          base = proximaData(base, recorrencia);
+        }
+        supabaseClient.from('contas_pagar').insert(novas.map(cp => contaPagarParaDb(cp))).then(({ error }) => {
+          if (error) console.error('Erro ao inserir novas ocorrências:', error);
+        });
+        toast(`Conta atualizada + ${repeticoes} ocorrência${repeticoes !== 1 ? 's' : ''} adicionada${repeticoes !== 1 ? 's' : ''}!`, 'success');
+        fecharModalCPForce();
+        if (viewAtual === 'contaspagar') renderContasPagar();
+        if (viewAtual === 'dashboard') renderDashboard();
+        return;
+      }
+
+      // Remover ocorrências futuras não pagas se solicitado
+      if (recorrencia !== 'nenhuma' && removerCP > 0) {
+        const serieGrupoId = grupoId || id;
+        const futuras = state.contasPagar
+          .filter(cp => (cp.grupoId === serieGrupoId || cp.id === serieGrupoId) && cp.id !== id && cp.status !== 'pago')
+          .sort((a, b) => b.dataVencimento.localeCompare(a.dataVencimento));
+        const aRemover = futuras.slice(0, removerCP);
+        if (aRemover.length > 0) {
+          const idsRemover = aRemover.map(cp => cp.id);
+          state.contasPagar = state.contasPagar.filter(cp => !idsRemover.includes(cp.id));
+          supabaseClient.from('contas_pagar').delete().in('id', idsRemover).then(({ error }) => {
+            if (error) console.error('Erro ao remover ocorrências:', error);
+          });
+          toast(`Conta atualizada — ${aRemover.length} ocorrência${aRemover.length !== 1 ? 's' : ''} removida${aRemover.length !== 1 ? 's' : ''}!`, 'success');
+          fecharModalCPForce();
+          if (viewAtual === 'contaspagar') renderContasPagar();
+          if (viewAtual === 'dashboard') renderDashboard();
+          return;
         }
       }
     }
@@ -2557,7 +2702,7 @@ function renderDespesas() {
 function abrirModalDespesa(id, preClienteId) {
   document.getElementById('formDespesa').reset();
   document.getElementById('editDespesaId').value = '';
-  document.getElementById('modalDespesaTitulo').textContent = 'Nova Despesa';
+  document.getElementById('modalDespesaTitulo').textContent = 'Nova Despesa Reembolsável';
   document.getElementById('dData').value = hoje();
   popularCategoriasDespesasForm();
   // Pre-select client by ID
@@ -2569,7 +2714,7 @@ function abrirModalDespesa(id, preClienteId) {
     const d = state.despesas.find(x => x.id === id);
     if (!d) return;
     document.getElementById('editDespesaId').value = d.id;
-    document.getElementById('modalDespesaTitulo').textContent = 'Editar Despesa';
+    document.getElementById('modalDespesaTitulo').textContent = 'Editar Despesa Reembolsável';
     const clienteNomeDisplay = d.clienteId ? (nomeClienteTexto(d.clienteId) || d.clienteNome || '') : (d.clienteNome || '');
     document.getElementById('dCliente').value = clienteNomeDisplay;
     document.getElementById('dDescricao').value = d.descricao;
@@ -2596,7 +2741,7 @@ function salvarDespesa(event) {
   const clienteExistente = state.clientes.find(c => c.nome.toLowerCase() === clienteTexto.toLowerCase());
   const dados = {
     clienteId: clienteExistente ? clienteExistente.id : null,
-    clienteNome: clienteTexto || null,
+    clienteNome: clienteTexto ? clienteTexto.toUpperCase() : null,
     descricao: document.getElementById('dDescricao').value.trim(),
     data: document.getElementById('dData').value,
     valor: parseMoedaBR(document.getElementById('dValor').value),
