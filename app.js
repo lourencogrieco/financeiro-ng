@@ -2658,19 +2658,16 @@ async function renderUsuarios() {
 
 async function alterarPerfilMembro(userId, novoPerfil, nome, selectEl) {
   if (!isAdm()) return;
-  const perfilLabel = PERFIS[novoPerfil]?.label || novoPerfil;
-  if (!confirm(`Alterar perfil de "${nome}" para "${perfilLabel}"?`)) {
-    // revert select
-    if (selectEl) { const { data } = await supabaseClient.from('usuarios_empresa').select('perfil').eq('user_id', userId).eq('empresa_id', state.empresaId).single(); if (data) selectEl.value = data.perfil; }
-    return;
-  }
+  if (selectEl) selectEl.disabled = true;
   const { error } = await supabaseClient
     .from('usuarios_empresa')
     .update({ perfil: novoPerfil })
     .eq('user_id', userId)
     .eq('empresa_id', state.empresaId);
-  if (error) { toast('Erro ao alterar perfil', 'error'); return; }
-  toast('Perfil atualizado!', 'success');
+  if (selectEl) selectEl.disabled = false;
+  if (error) { toast('Erro ao alterar perfil', 'error'); renderUsuarios(); return; }
+  const perfilLabel = PERFIS[novoPerfil]?.label || novoPerfil;
+  toast(`${nome} agora é ${perfilLabel}`, 'success');
   renderUsuarios();
 }
 
