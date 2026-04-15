@@ -514,6 +514,7 @@ body {
   transition: all .15s;
 }
 .btn-icon:hover { background: var(--bg); color: var(--text); }
+.btn-icon.success { color: var(--success); }
 .btn-icon.success:hover { background: var(--success-light); color: var(--success); }
 .btn-icon.danger:hover { background: var(--danger-light); color: var(--danger); }
 

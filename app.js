@@ -153,6 +153,7 @@ let state = {
 
 let viewAtual = 'dashboard';
 let baixaIdAtual = null;
+let editarMembroAtivo = null;
 let baixaColecao = 'cobrancas'; // 'cobrancas' | 'contaspagar'
 let chartCategoria = null;
 let chartEvolucao = null;
@@ -2633,8 +2634,10 @@ async function renderUsuarios() {
     const ini = (m.nome || '?').split(' ').filter(Boolean).map(w => w[0]).join('').slice(0, 2).toUpperCase();
     const isMe = m.user_id === state.meuPerfil?.userId;
     const perfilInfo = PERFIS[m.perfil] || { label: m.perfil, cor: 'badge-pendente' };
-    const optsHtml = perfisOpcoes.map(o => `<option value="${o.value}" ${m.perfil === o.value ? 'selected' : ''}>${o.label}</option>`).join('');
     const nomeEsc = m.nome.replace(/'/g, "\\'");
+    const editando = isAdmin && !isMe && editarMembroAtivo === m.user_id;
+    const optsHtml = perfisOpcoes.map(o => `<option value="${o.value}" ${m.perfil === o.value ? 'selected' : ''}>${o.label}</option>`).join('');
+
     return `
       <div class="team-member-item">
         <div class="team-avatar">${ini}</div>
@@ -2643,10 +2646,22 @@ async function renderUsuarios() {
           <div class="team-desde">${m.cargo ? `${m.cargo} · ` : ''}Desde ${fmtData(m.criado_em?.slice(0, 10))}</div>
         </div>
         <div class="team-actions">
-          ${isAdmin && !isMe
-            ? `<select class="perfil-select" onchange="alterarPerfilMembro('${m.user_id}',this.value,'${nomeEsc}',this)">${optsHtml}</select>`
-            : `<span class="badge ${perfilInfo.cor}">${perfilInfo.label}</span>`
-          }
+          ${editando ? `
+            <select class="perfil-select" id="selectMembro_${m.user_id}">${optsHtml}</select>
+            <button class="btn-icon success" title="Confirmar" onclick="confirmarPerfilMembro('${m.user_id}','${nomeEsc}')">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+            </button>
+            <button class="btn-icon" title="Cancelar" onclick="cancelarEdicaoMembro()">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          ` : `
+            <span class="badge ${perfilInfo.cor}">${perfilInfo.label}</span>
+            ${isAdmin && !isMe ? `
+              <button class="btn-icon" title="Editar perfil" onclick="iniciarEdicaoMembro('${m.user_id}')">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+              </button>
+            ` : ''}
+          `}
           ${isAdmin && !isMe ? `
           <button class="btn-icon danger" title="Remover da equipe" onclick="removerMembro('${m.user_id}','${nomeEsc}')">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
@@ -2656,16 +2671,40 @@ async function renderUsuarios() {
   }).join('');
 }
 
-async function alterarPerfilMembro(userId, novoPerfil, nome, selectEl) {
+function iniciarEdicaoMembro(userId) {
+  editarMembroAtivo = userId;
+  renderUsuarios();
+}
+
+function cancelarEdicaoMembro() {
+  editarMembroAtivo = null;
+  renderUsuarios();
+}
+
+async function confirmarPerfilMembro(userId, nome) {
   if (!isAdm()) return;
-  if (selectEl) selectEl.disabled = true;
+  const sel = document.getElementById(`selectMembro_${userId}`);
+  if (!sel) return;
+  const novoPerfil = sel.value;
   const { error } = await supabaseClient
     .from('usuarios_empresa')
     .update({ perfil: novoPerfil })
     .eq('user_id', userId)
     .eq('empresa_id', state.empresaId);
-  if (selectEl) selectEl.disabled = false;
-  if (error) { toast('Erro ao alterar perfil', 'error'); renderUsuarios(); return; }
+  if (error) { toast('Erro ao alterar perfil', 'error'); return; }
+  toast(`${nome} agora é ${PERFIS[novoPerfil]?.label || novoPerfil}`, 'success');
+  editarMembroAtivo = null;
+  renderUsuarios();
+}
+
+async function alterarPerfilMembro(userId, novoPerfil, nome) {
+  // mantido por compatibilidade
+  const { error } = await supabaseClient
+    .from('usuarios_empresa')
+    .update({ perfil: novoPerfil })
+    .eq('user_id', userId)
+    .eq('empresa_id', state.empresaId);
+  if (error) { toast('Erro ao alterar perfil', 'error'); return; }
   const perfilLabel = PERFIS[novoPerfil]?.label || novoPerfil;
   toast(`${nome} agora é ${perfilLabel}`, 'success');
   renderUsuarios();
