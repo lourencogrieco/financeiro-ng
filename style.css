@@ -254,6 +254,34 @@ body {
 .alerta-warning { background: var(--warning-light); color: #92400e; border: 1px solid #fcd34d; }
 .alerta svg { flex-shrink: 0; }
 
+.alerta-tooltip { position: relative; }
+.alerta-tooltip::after {
+  content: attr(data-tooltip);
+  white-space: pre;
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  background: #1e293b;
+  color: #f1f5f9;
+  font-size: 12px;
+  font-weight: 400;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  line-height: 1.7;
+  padding: 10px 14px;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0,0,0,.25);
+  z-index: 200;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: opacity .15s, transform .15s;
+  min-width: 340px;
+}
+.alerta-tooltip:hover::after {
+  opacity: 1;
+  transform: translateY(0);
+}
+
 /* ===== Lista Proximas ===== */
 .cobranca-item {
   display: flex;
@@ -898,13 +926,24 @@ form { padding: 20px 24px 0; }
 
 /* ===== Recorrencia badge ===== */
 .rec-badge {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   padding: 2px 7px;
   border-radius: 4px;
   font-size: 11px;
   font-weight: 600;
   background: var(--primary-light);
   color: var(--primary);
+}
+.parcela-tag {
+  background: var(--primary);
+  color: #fff;
+  border-radius: 3px;
+  padding: 1px 5px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .3px;
 }
 
 /* ===== Print Overlay ===== */

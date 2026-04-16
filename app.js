@@ -367,6 +367,8 @@ function cobrancaParaDb(c) {
     valor_pago: c.valorPago != null ? c.valorPago : null,
     criado_em: c.criadoEm || new Date().toISOString(),
     grupo_id: c.grupoId || null,
+    parcela_num: c.parcelaNum || null,
+    parcela_total: c.parcelaTotal || null,
   };
 }
 function dbParaCobranca(row) {
@@ -379,6 +381,8 @@ function dbParaCobranca(row) {
     valorPago: row.valor_pago != null ? Number(row.valor_pago) : null,
     criadoEm: row.criado_em,
     grupoId: row.grupo_id || null,
+    parcelaNum: row.parcela_num || null,
+    parcelaTotal: row.parcela_total || null,
   };
 }
 
@@ -418,6 +422,8 @@ function contaPagarParaDb(cp) {
     valor_pago: cp.valorPago != null ? cp.valorPago : null,
     criado_em: cp.criadoEm || new Date().toISOString(),
     grupo_id: cp.grupoId || null,
+    parcela_num: cp.parcelaNum || null,
+    parcela_total: cp.parcelaTotal || null,
   };
 }
 function dbParaContaPagar(row) {
@@ -429,6 +435,8 @@ function dbParaContaPagar(row) {
     valorPago: row.valor_pago != null ? Number(row.valor_pago) : null,
     criadoEm: row.criado_em,
     grupoId: row.grupo_id || null,
+    parcelaNum: row.parcela_num || null,
+    parcelaTotal: row.parcela_total || null,
   };
 }
 
@@ -859,18 +867,53 @@ function renderDashboard() {
   document.getElementById('res-liquido-icon').textContent = liquido >= 0 ? '▲' : '▼';
 
   // Alertas
+  const cpVencidas = state.contasPagar.filter(cp => cp.status === 'vencido');
+  const cpProximas = state.contasPagar.filter(cp => {
+    const d = diasAte(cp.dataVencimento);
+    return cp.status === 'pendente' && d >= 0 && d <= dias;
+  });
+
   const alertasEl = document.getElementById('alertas-container');
   let alertasHtml = '';
+
   if (vencidas.length > 0) {
-    alertasHtml += `<div class="alerta alerta-danger">
+    const tooltipVencidas = vencidas
+      .sort((a, b) => a.dataVencimento.localeCompare(b.dataVencimento))
+      .map(c => `${fmtData(c.dataVencimento)}  ${(c.clienteNome || nomeClienteTexto(c.clienteId) || 'Sem cliente').slice(0,28)}  ${fmt(c.valor)}`)
+      .join('&#10;');
+    alertasHtml += `<div class="alerta alerta-danger alerta-tooltip" data-tooltip="${tooltipVencidas}" style="cursor:default">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-      <span><strong>${vencidas.length} cobrança${vencidas.length !== 1 ? 's' : ''} vencida${vencidas.length !== 1 ? 's' : ''}!</strong> Total: ${fmt(vencidas.reduce((s,c) => s+c.valor, 0))}</span>
+      <span><strong>${vencidas.length} cobrança${vencidas.length !== 1 ? 's' : ''} vencida${vencidas.length !== 1 ? 's' : ''}!</strong> Total: ${fmt(vencidas.reduce((s,c) => s+c.valor, 0))} <span style="font-size:11px;opacity:.7">— passe o mouse para ver</span></span>
+    </div>`;
+  }
+  if (cpVencidas.length > 0) {
+    const tooltipCP = cpVencidas
+      .sort((a, b) => a.dataVencimento.localeCompare(b.dataVencimento))
+      .map(cp => `${fmtData(cp.dataVencimento)}  ${(cp.descricao || 'Sem descrição').slice(0,28)}  ${fmt(cp.valor)}`)
+      .join('&#10;');
+    alertasHtml += `<div class="alerta alerta-danger alerta-tooltip" data-tooltip="${tooltipCP}" style="cursor:default">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      <span><strong>${cpVencidas.length} conta${cpVencidas.length !== 1 ? 's' : ''} a pagar vencida${cpVencidas.length !== 1 ? 's' : ''}!</strong> Total: ${fmt(cpVencidas.reduce((s,cp) => s+cp.valor, 0))} <span style="font-size:11px;opacity:.7">— passe o mouse para ver</span></span>
     </div>`;
   }
   if (proximas.length > 0) {
-    alertasHtml += `<div class="alerta alerta-warning">
+    const tooltipProximas = proximas
+      .sort((a, b) => a.dataVencimento.localeCompare(b.dataVencimento))
+      .map(c => `${fmtData(c.dataVencimento)}  ${(c.clienteNome || nomeClienteTexto(c.clienteId) || 'Sem cliente').slice(0,28)}  ${fmt(c.valor)}`)
+      .join('&#10;');
+    alertasHtml += `<div class="alerta alerta-warning alerta-tooltip" data-tooltip="${tooltipProximas}" style="cursor:default">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-      <span><strong>${proximas.length} cobrança${proximas.length !== 1 ? 's' : ''}</strong> vence${proximas.length !== 1 ? 'm' : ''} nos próximos ${dias} dias</span>
+      <span><strong>${proximas.length} cobrança${proximas.length !== 1 ? 's' : ''}</strong> vence${proximas.length !== 1 ? 'm' : ''} nos próximos ${dias} dias <span style="font-size:11px;opacity:.7">— passe o mouse para ver</span></span>
+    </div>`;
+  }
+  if (cpProximas.length > 0) {
+    const tooltipCPProx = cpProximas
+      .sort((a, b) => a.dataVencimento.localeCompare(b.dataVencimento))
+      .map(cp => `${fmtData(cp.dataVencimento)}  ${(cp.descricao || 'Sem descrição').slice(0,28)}  ${fmt(cp.valor)}`)
+      .join('&#10;');
+    alertasHtml += `<div class="alerta alerta-warning alerta-tooltip" data-tooltip="${tooltipCPProx}" style="cursor:default">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      <span><strong>${cpProximas.length} conta${cpProximas.length !== 1 ? 's' : ''} a pagar</strong> vence${cpProximas.length !== 1 ? 'm' : ''} nos próximos ${dias} dias <span style="font-size:11px;opacity:.7">— passe o mouse para ver</span></span>
     </div>`;
   }
   alertasEl.innerHTML = alertasHtml;
@@ -1057,7 +1100,7 @@ function renderCobrancas() {
         </td>
         <td style="white-space:nowrap">${fmtData(c.dataVencimento)}</td>
         <td style="font-weight:700;white-space:nowrap">${fmt(c.valor)}</td>
-        <td>${c.recorrencia !== 'nenhuma' ? `<span class="rec-badge">${c.recorrencia}</span>` : '<span style="color:var(--text-light)">—</span>'}</td>
+        <td>${c.recorrencia !== 'nenhuma' ? `<span class="rec-badge">${c.recorrencia}${c.parcelaNum ? `<span class="parcela-tag">${c.parcelaNum}/${c.parcelaTotal}</span>` : ''}</span>` : '<span style="color:var(--text-light)">—</span>'}</td>
         <td><span class="badge badge-${c.status}">${c.status.charAt(0).toUpperCase() + c.status.slice(1)}</span></td>
         <td>
           <div class="actions">
@@ -1221,6 +1264,8 @@ function salvarCobranca(event) {
         const ultimaData = serie.reduce((max, c) => c.dataVencimento > max ? c.dataVencimento : max, dataVencimento);
         const diaOriginal = new Date(dataVencimento + 'T00:00:00').getDate();
         let base = proximaData(new Date(ultimaData + 'T00:00:00'), recorrencia, diaOriginal);
+        const maxParcelaAtual = serie.reduce((max, c) => Math.max(max, c.parcelaNum || 0), 0);
+        const novoTotal = maxParcelaAtual + repeticoes;
         const novas = [];
         for (let i = 0; i < repeticoes; i++) {
           const dStr = base.toISOString().slice(0, 10);
@@ -1229,15 +1274,26 @@ function salvarCobranca(event) {
             categoria, recorrencia, observacoes, status: 'pendente',
             dataPagamento: null, valorPago: null,
             criadoEm: new Date().toISOString(), grupoId: serieGrupoId,
+            parcelaNum: maxParcelaAtual + i + 1, parcelaTotal: novoTotal,
           };
           nova.status = calcularStatus(nova);
           state.cobrancas.push(nova);
           novas.push(nova);
           base = proximaData(base, recorrencia, diaOriginal);
         }
+        // Atualizar parcelaTotal em toda a série existente
+        state.cobrancas.forEach((c, i) => {
+          if ((c.grupoId === serieGrupoId || c.id === serieGrupoId) && !novas.includes(c)) {
+            state.cobrancas[i] = { ...c, parcelaTotal: novoTotal };
+          }
+        });
         supabaseClient.from('cobrancas').insert(novas.map(c => cobrancaParaDb(c))).then(({ error }) => {
           if (error) console.error('Erro ao inserir novas ocorrências:', error);
         });
+        supabaseClient.from('cobrancas').update({ parcela_total: novoTotal })
+          .eq('grupo_id', serieGrupoId).then(({ error }) => {
+            if (error) console.error('Erro ao atualizar parcela_total:', error);
+          });
         toast(`Cobrança atualizada + ${repeticoes} ocorrência${repeticoes !== 1 ? 's' : ''} adicionada${repeticoes !== 1 ? 's' : ''}!`, 'success');
         fecharModalForce();
         if (viewAtual === 'dashboard') renderDashboard();
@@ -1293,6 +1349,8 @@ function salvarCobranca(event) {
         valorPago: null,
         criadoEm: new Date().toISOString(),
         grupoId,
+        parcelaNum:   recorrencia !== 'nenhuma' ? i + 1   : null,
+        parcelaTotal: recorrencia !== 'nenhuma' ? qtd      : null,
       };
       novaC.status = calcularStatus(novaC);
       state.cobrancas.push(novaC);
@@ -2193,7 +2251,7 @@ function renderContasPagar() {
         </td>
         <td style="white-space:nowrap">${fmtData(cp.dataVencimento)}</td>
         <td style="font-weight:700;white-space:nowrap">${fmt(cp.valor)}</td>
-        <td>${cp.recorrencia !== 'nenhuma' ? `<span class="rec-badge">${cp.recorrencia}</span>` : '<span style="color:var(--text-light)">—</span>'}</td>
+        <td>${cp.recorrencia !== 'nenhuma' ? `<span class="rec-badge">${cp.recorrencia}${cp.parcelaNum ? `<span class="parcela-tag">${cp.parcelaNum}/${cp.parcelaTotal}</span>` : ''}</span>` : '<span style="color:var(--text-light)">—</span>'}</td>
         <td><span class="badge badge-${cp.status}">${cp.status.charAt(0).toUpperCase() + cp.status.slice(1)}</span></td>
         <td>
           <div class="actions">
@@ -2331,6 +2389,8 @@ function salvarContaPagar(event) {
         const ultimaData = serie.reduce((max, cp) => cp.dataVencimento > max ? cp.dataVencimento : max, dataVencimento);
         const diaOriginal = new Date(dataVencimento + 'T00:00:00').getDate();
         let base = proximaData(new Date(ultimaData + 'T00:00:00'), recorrencia, diaOriginal);
+        const maxParcelaAtual = serie.reduce((max, cp) => Math.max(max, cp.parcelaNum || 0), 0);
+        const novoTotal = maxParcelaAtual + repeticoes;
         const novas = [];
         for (let i = 0; i < repeticoes; i++) {
           const dStr = base.toISOString().slice(0, 10);
@@ -2338,15 +2398,26 @@ function salvarContaPagar(event) {
             id: uid(), descricao, tipo, dataVencimento: dStr, valor, recorrencia, observacoes,
             status: 'pendente', dataPagamento: null, valorPago: null,
             criadoEm: new Date().toISOString(), grupoId: serieGrupoId,
+            parcelaNum: maxParcelaAtual + i + 1, parcelaTotal: novoTotal,
           };
           nova.status = calcularStatusCP(nova);
           state.contasPagar.push(nova);
           novas.push(nova);
           base = proximaData(base, recorrencia, diaOriginal);
         }
+        // Atualizar parcelaTotal em toda a série existente
+        state.contasPagar.forEach((cp, i) => {
+          if ((cp.grupoId === serieGrupoId || cp.id === serieGrupoId) && !novas.includes(cp)) {
+            state.contasPagar[i] = { ...cp, parcelaTotal: novoTotal };
+          }
+        });
         supabaseClient.from('contas_pagar').insert(novas.map(cp => contaPagarParaDb(cp))).then(({ error }) => {
           if (error) console.error('Erro ao inserir novas ocorrências:', error);
         });
+        supabaseClient.from('contas_pagar').update({ parcela_total: novoTotal })
+          .eq('grupo_id', serieGrupoId).then(({ error }) => {
+            if (error) console.error('Erro ao atualizar parcela_total:', error);
+          });
         toast(`Conta atualizada + ${repeticoes} ocorrência${repeticoes !== 1 ? 's' : ''} adicionada${repeticoes !== 1 ? 's' : ''}!`, 'success');
         fecharModalCPForce();
         if (viewAtual === 'contaspagar') renderContasPagar();
@@ -2384,7 +2455,13 @@ function salvarContaPagar(event) {
     const grupoId = recorrencia !== 'nenhuma' ? uid() : null;
     for (let i = 0; i < qtd; i++) {
       const dStr = base.toISOString().slice(0, 10);
-      const novaCP = { id: uid(), descricao, tipo, dataVencimento: dStr, valor, recorrencia, observacoes, status: 'pendente', dataPagamento: null, valorPago: null, criadoEm: new Date().toISOString(), grupoId };
+      const novaCP = {
+        id: uid(), descricao, tipo, dataVencimento: dStr, valor, recorrencia, observacoes,
+        status: 'pendente', dataPagamento: null, valorPago: null,
+        criadoEm: new Date().toISOString(), grupoId,
+        parcelaNum:   recorrencia !== 'nenhuma' ? i + 1 : null,
+        parcelaTotal: recorrencia !== 'nenhuma' ? qtd    : null,
+      };
       novaCP.status = calcularStatusCP(novaCP);
       state.contasPagar.push(novaCP);
       novasCP.push(novaCP);
