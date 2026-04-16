@@ -1951,6 +1951,8 @@ function renderCategoriasSection(tipo) {
   }
   el.innerHTML = arr.map((c, i) => `
     <span class="tag" style="background:${c.cor}">
+      <input type="color" class="tag-color-edit" value="${c.cor}" title="Alterar cor"
+        onchange="alterarCorCategoria('${tipo}',${i},this.value)">
       ${c.nome}
       <button class="tag-remove" onclick="removerCategoriaSection('${tipo}',${i})" title="Remover">×</button>
     </span>
@@ -1973,6 +1975,15 @@ function adicionarCategoriaSection(tipo) {
   if (tipo === 'cp') popularCategoriasCP();
   document.getElementById(inputId).value = '';
   toast('Categoria adicionada!', 'success');
+}
+
+function alterarCorCategoria(tipo, idx, novaCor) {
+  const arr = getCategoriasArray(tipo);
+  if (!arr[idx]) return;
+  arr[idx] = { ...arr[idx], cor: novaCor };
+  salvarConfigSupabase();
+  renderCategoriasSection(tipo);
+  toast('Cor atualizada!', 'success');
 }
 
 function removerCategoriaSection(tipo, idx) {
