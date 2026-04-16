@@ -120,10 +120,10 @@ let state = {
 
   cobrancas: [],
   categorias: [
-    { nome: 'Honorários de Êxito',   cor: '#6366f1' },
-    { nome: 'Honorários Mensais',    cor: '#8b5cf6' },
-    { nome: 'Honorários Pro-Labore', cor: '#a855f7' },
-    { nome: 'Custas',                cor: '#3b82f6' },
+    { nome: 'Honorários de Êxito',   cor: '#10b981' },
+    { nome: 'Honorários Mensais',    cor: '#3b82f6' },
+    { nome: 'Honorários Pro-Labore', cor: '#f59e0b' },
+    { nome: 'Custas',                cor: '#6366f1' },
     { nome: 'Diligências',           cor: '#06b6d4' },
     { nome: 'Impostos',              cor: '#ef4444' },
     { nome: 'Outros',                cor: '#6b7280' },
