@@ -175,15 +175,15 @@ body {
 /* ===== Cards Grid ===== */
 .cards-grid {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 10px;
   margin-bottom: 24px;
 }
 
 .card {
   background: var(--surface);
   border-radius: var(--radius);
-  padding: 16px;
+  padding: 12px 14px;
   border: 1px solid var(--border);
   border-left: 3px solid transparent;
   min-width: 0;
@@ -210,9 +210,9 @@ body {
   margin-top: 4px;
 }
 
-.card-label { font-size: 11px; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: .4px; margin-bottom: 8px; }
-.card-value { font-size: 22px; font-weight: 800; color: var(--text); margin-bottom: 4px; }
-.card-sub { font-size: 12px; color: var(--text-muted); }
+.card-label { font-size: 10px; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: .4px; margin-bottom: 6px; }
+.card-value { font-size: 18px; font-weight: 800; color: var(--text); margin-bottom: 3px; }
+.card-sub { font-size: 11px; color: var(--text-muted); }
 
 /* ===== Section ===== */
 .section-row {
@@ -1084,6 +1084,10 @@ form { padding: 20px 24px 0; }
 }
 
 /* ===== Responsive ===== */
+@media (max-width: 1100px) {
+  .cards-grid { grid-template-columns: repeat(3, 1fr); }
+}
+
 @media (max-width: 900px) {
   .cards-grid { grid-template-columns: repeat(2, 1fr); }
   .section-row { flex-direction: column; }

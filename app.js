@@ -821,6 +821,15 @@ function renderDashboard() {
   document.getElementById('totalProximas').textContent = fmt(proximas.reduce((s, c) => s + c.valor, 0));
   document.getElementById('qtdProximas').textContent = `${proximas.length} cobrança${proximas.length !== 1 ? 's' : ''}`;
 
+  const brutoMes = state.cobrancas.filter(c => {
+    if (!c.dataVencimento) return false;
+    const [y, m] = c.dataVencimento.split('-');
+    return parseInt(m) === mesAtual && parseInt(y) === anoAtual;
+  });
+  const totalBrutoMes = brutoMes.reduce((s, c) => s + c.valor, 0);
+  document.getElementById('totalBrutoMes').textContent = fmt(totalBrutoMes);
+  document.getElementById('qtdBrutoMes').textContent = `${brutoMes.length} cobrança${brutoMes.length !== 1 ? 's' : ''}`;
+
   const receberMes = state.cobrancas.filter(c => {
     if (c.status === 'pago') return false;
     if (!c.dataVencimento) return false;
